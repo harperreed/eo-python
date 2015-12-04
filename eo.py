@@ -120,7 +120,7 @@ class electric_object:
 #     $ EO_USER=you@example.com EO_PASS=pword python eo.py
 #
 # Don't forget to clear your command history if you don't want the credentials stored.
-# 
+#
 # This function allows us to avoid uploading credentials to GitHub. In addition to not
 # writing them here, the credentials filename is included in the .gitignore file.
 #
