@@ -26,7 +26,7 @@ class electric_object:
     def make_request(self, url, params=None, method='GET', ):
         with requests.Session() as s:
             eo_sign = s.get('https://www.electricobjects.com/sign_in')
-            authenticity_token = eo_sign.text.encode('utf-8').strip().split("name=\"authenticity_token\" type=\"hidden\" value=\"")[1].split("\" /></div>")[0]
+            authenticity_token = eo_sign.text.encode('utf-8').strip().split("type=\"hidden\" name=\"authenticity_token\" value=\"")[1].split("\" />")[0]
             payload = {
                 "user[email]":self.username,
                 "user[password]":self.password
