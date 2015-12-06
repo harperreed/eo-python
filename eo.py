@@ -1,9 +1,7 @@
-import requests
-
-import urllib
-import requests
 import json
+import os
 import random
+import requests
 
 """
   here is a wrapper for the *unreleased* electric objects API
@@ -12,6 +10,10 @@ import random
   Hopefully someday a real API will appear
 
 """
+
+CREDENTIALS_FILE = '.credentials'
+USER_ENV_VAR = 'EO_USER'
+PASSWORD_ENV_VAR = 'EO_PASS'
 
 class electric_object:
     base_url = 'https://www.electricobjects.com/'
@@ -24,7 +26,7 @@ class electric_object:
     def make_request(self, url, params=None, method='GET', ):
         with requests.Session() as s:
             eo_sign = s.get('https://www.electricobjects.com/sign_in')
-            authenticity_token = eo_sign.text.encode('utf-8').strip().split("name=\"authenticity_token\" type=\"hidden\" value=\"")[1].split("\" /></div>")[0]
+            authenticity_token = eo_sign.text.encode('utf-8').strip().split("type=\"hidden\" name=\"authenticity_token\" value=\"")[1].split("\" />")[0]
             payload = {
                 "user[email]":self.username,
                 "user[password]":self.password
@@ -111,13 +113,42 @@ class electric_object:
                     return False
 
 
+# Obtains the electricobjects.com username and password. They can be set here in the code,
+# in environment variables, or in a file named by CREDENTIALS_FILE.
+# A simple way to set them in the environment variables is prefix your command with them.
+# For example:
+#     $ EO_USER=you@example.com EO_PASS=pword python eo.py
+#
+# Don't forget to clear your command history if you don't want the credentials stored.
+#
+# This function allows us to avoid uploading credentials to GitHub. In addition to not
+# writing them here, the credentials filename is included in the .gitignore file.
+#
+# The sources are read in the order of: default, then environment variables, then file.
+# Each source overwrites the username and password separately, if set in that source.
+#
+def get_credentials():
+    username = ''  # You can set them here if you don't plan on uploading to GitHub.
+    password = ''
+
+    username = os.environ[USER_ENV_VAR] if USER_ENV_VAR in os.environ else username
+    password = os.environ[PASSWORD_ENV_VAR] if PASSWORD_ENV_VAR in os.environ else password
+
+    try:
+        with open(CREDENTIALS_FILE, 'r') as f:
+            username = next(f).strip()
+            password = next(f).strip()
+    except:
+        pass  # Fail silently if no file, missing lines, or other problem.
+
+    return {"username": username, "password": password}
+
 
 if __name__ == "__main__":
     #How to use this dude:
     #instantiate it. yay!
-    username = '' #Email
-    password = '' #Hope your password is strong and unique!
-    eo = electric_object(username=username, password=password)
+    credentials = get_credentials()
+    eo = electric_object(username=credentials["username"], password=credentials["password"])
     favs = eo.display_random_favorite()
 
     #Let's favorite and unfavorite medias:
