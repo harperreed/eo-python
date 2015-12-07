@@ -1,3 +1,4 @@
+from lxml import html
 import json
 import os
 import random
@@ -25,13 +26,17 @@ class electric_object:
 
     def make_request(self, url, params=None, method='GET', ):
         with requests.Session() as s:
-            eo_sign = s.get('https://www.electricobjects.com/sign_in')
-            authenticity_token = eo_sign.text.encode('utf-8').strip().split("type=\"hidden\" name=\"authenticity_token\" value=\"")[1].split("\" />")[0]
+            # Sign in
+            signin_response = s.get('https://www.electricobjects.com/sign_in')
+            tree = html.fromstring(signin_response.content)
+            authenticity_token = tree.xpath("string(//input[@name='authenticity_token']/@value)")
+            if authenticity_token == "":
+                return signin_response
             payload = {
                 "user[email]": self.username,
-                "user[password]": self.password
+                "user[password]": self.password,
+                "authenticity_token": authenticity_token
             }
-            payload['authenticity_token'] = authenticity_token
             p = s.post('https://www.electricobjects.com/sign_in', data=payload)
             if p.status_code == 200:
                 url = self.base_url + url
