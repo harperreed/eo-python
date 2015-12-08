@@ -1,3 +1,4 @@
+from lxml import html
 import json
 import os
 import random
@@ -15,23 +16,27 @@ CREDENTIALS_FILE = '.credentials'
 USER_ENV_VAR = 'EO_USER'
 PASSWORD_ENV_VAR = 'EO_PASS'
 
+
 class electric_object:
     base_url = 'https://www.electricobjects.com/'
 
     def __init__(self, username, password):
-          self.username = username
-          self.password = password
-
+        self.username = username
+        self.password = password
 
     def make_request(self, url, params=None, method='GET', ):
         with requests.Session() as s:
-            eo_sign = s.get('https://www.electricobjects.com/sign_in')
-            authenticity_token = eo_sign.text.encode('utf-8').strip().split("type=\"hidden\" name=\"authenticity_token\" value=\"")[1].split("\" />")[0]
+            # Sign in
+            signin_response = s.get('https://www.electricobjects.com/sign_in')
+            tree = html.fromstring(signin_response.content)
+            authenticity_token = tree.xpath("string(//input[@name='authenticity_token']/@value)")
+            if authenticity_token == "":
+                return signin_response
             payload = {
-                "user[email]":self.username,
-                "user[password]":self.password
+                "user[email]": self.username,
+                "user[password]": self.password,
+                "authenticity_token": authenticity_token
             }
-            payload['authenticity_token'] = authenticity_token
             p = s.post('https://www.electricobjects.com/sign_in', data=payload)
             if p.status_code == 200:
                 url = self.base_url + url
@@ -50,34 +55,32 @@ class electric_object:
                 else:
                     return r.text.encode('utf-8').strip()
 
-    #Set a media as a favorite
+    # Set a media as a favorite
     def user(self):
         url = "/api/beta/user/"
         return self.make_request(url, method='GET')
 
-    #Set a media as a favorite
+    # Set a media as a favorite
     def favorite(self, media_id):
         url = "/api/beta/user/artworks/favorited/" + media_id
         return self.make_request(url, method='PUT')
 
-    #Remove a media as a favorite
+    # Remove a media as a favorite
     def unfavorite(self, media_id):
         url = "/api/beta/user/artworks/favorited/" + media_id
         return self.make_request(url, method='DELETE')
 
-    #Display a piece of media
+    # Display a piece of media
     def display(self, media_id):
         url = "/api/beta/user/artworks/displayed/" + media_id
         return self.make_request(url, method='PUT')
 
-
     def favorites(self):
-
         url = "/api/beta/user/artworks/favorited"
         favorites_json = json.loads(self.make_request(url, method='GET'))
         return favorites_json
 
-    #Display a piece of media
+    # Display a piece of media
     def display_random_favorite(self):
         favs = self.favorites()
         fav = random.choice(favs)
@@ -85,16 +88,16 @@ class electric_object:
         print media_id
         return self.display(media_id)
 
-    #Set a url to be on the display
-    #IN PROGRESS
+    # Set a url to be on the display
+    # IN PROGRESS
     def set_url(self, url):
         url = "set_url"
         with requests.Session() as s:
             eo_sign = s.get('https://www.electricobjects.com/sign_in')
             authenticity_token = eo_sign.text.encode('utf-8').strip().split("name=\"authenticity_token\" type=\"hidden\" value=\"")[1].split("\" /></div>")[0]
             payload = {
-                "user[email]":self.username,
-                "user[password]":self.password
+                "user[email]": self.username,
+                "user[password]": self.password
             }
             payload['authenticity_token'] = authenticity_token
             p = s.post('https://www.electricobjects.com/sign_in', data=payload)
@@ -103,8 +106,8 @@ class electric_object:
                 authenticity_token = eo_sign.text.encode('utf-8').strip().split("name=\"authenticity_token\" type=\"hidden\" value=\"")[1].split("\" /></div>")[0]
                 print authenticity_token
                 params = {
-                  "custom_url":url,
-                  "authenticity_token":authenticity_token
+                  "custom_url": url,
+                  "authenticity_token": authenticity_token
                 }
                 r = s.post(self.base_url + url, params=params)
                 if r.status_code == 200:
@@ -145,22 +148,22 @@ def get_credentials():
 
 
 if __name__ == "__main__":
-    #How to use this dude:
-    #instantiate it. yay!
+    # How to use this dude:
+    # instantiate it. yay!
     credentials = get_credentials()
     eo = electric_object(username=credentials["username"], password=credentials["password"])
     favs = eo.display_random_favorite()
 
-    #Let's favorite and unfavorite medias:
-    #now favorite
-    #print eo.favorite("5626")
-    #now unfavorite
-    #print eo.unfavorite("5626")
+    # Let's favorite and unfavorite medias:
+    # now favorite
+    # print eo.favorite("5626")
+    # now unfavorite
+    # print eo.unfavorite("5626")
 
-    #Displaying in
-    #Display a URL
-    #art = ['5568','1136']
-    #print eo.display("1136")
+    # Displaying in
+    # Display a URL
+    # art = ['5568','1136']
+    # print eo.display("1136")
 
-    #Let's set a url
-    #print eo.set_url("http://www.harperreed.com/")
+    # Let's set a url
+    # print eo.set_url("http://www.harperreed.com/")
