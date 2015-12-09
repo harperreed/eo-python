@@ -23,37 +23,63 @@ class electric_object:
     def __init__(self, username, password):
         self.username = username
         self.password = password
+        self.signed_in_session = None
 
-    def make_request(self, url, params=None, method='GET', ):
-        with requests.Session() as s:
-            # Sign in
-            signin_response = s.get('https://www.electricobjects.com/sign_in')
+    def signin(self):
+        """ Sign in. If successful, set self.signed_in_session to the session for reuse in
+            subsequent requests. If not, set self.signed_in_session to None.
+
+            Note that while the session in self.signed_in_session can be reused for subsequent
+            requests, the sign-in may expire after some time. So requests that fail should
+            try signing in again.
+        """
+        self.signed_in_session = None
+        try:
+            session = requests.Session()
+            signin_response = session.get('https://www.electricobjects.com/sign_in')
+            if signin_response.status_code != requests.codes.ok:
+                print 'Error: unable to sign in. Status: ', signin_response.status_code, ", response: ", signin_response.text
+                return
             tree = html.fromstring(signin_response.content)
             authenticity_token = tree.xpath("string(//input[@name='authenticity_token']/@value)")
             if authenticity_token == "":
-                return signin_response
+                return
             payload = {
                 "user[email]": self.username,
                 "user[password]": self.password,
                 "authenticity_token": authenticity_token
             }
-            p = s.post('https://www.electricobjects.com/sign_in', data=payload)
-            if p.status_code == 200:
-                url = self.base_url + url
-                # An authorised request.
-                if method == "GET":
-                    r = s.get(url)
-                elif method == "POST":
-                    r = s.post(url, params=params)
-                elif method == "PUT":
-                    r = s.put(url)
-                elif method == "DELETE":
-                    r = s.delete(url)
+            p = session.post('https://www.electricobjects.com/sign_in', data=payload)
+            if p.status_code != requests.codes.ok:
+                print 'Error: unable to sign in. Status: ', p.status_code, ", response: ", requests.text
+                return
+            self.signed_in_session = session
+        except Exception as e:
+            print e
 
-                if r.status_code == 204:
-                    return True
-                else:
-                    return r.text.encode('utf-8').strip()
+    def signed_in(self):
+        """ Return true if we have a valid signed-in session. """
+        return self.signed_in_session is not None
+
+    def make_request(self, url, params=None, method='GET', ):
+        if not self.signed_in():
+            self.signin()
+            if not self.signed_in():
+                return None
+
+        url = self.base_url + url
+        # TODO(gary): These requests should retry in case the sign-in has expired.
+        if method == "GET":
+            return self.signed_in_session.get(url)
+        elif method == "POST":
+            return self.signed_in_session.post(url, params=params)
+        elif method == "PUT":
+            return self.signed_in_session.put(url)
+        elif method == "DELETE":
+            return self.signed_in_session.delete(url)
+
+        print 'Error: Unknown request type in make_request'
+        return None
 
     # Set a media as a favorite
     def user(self):
@@ -76,13 +102,30 @@ class electric_object:
         return self.make_request(url, method='PUT')
 
     def favorites(self):
+        """ Return a list of favorites in JSON else []. """
         url = "/api/beta/user/artworks/favorited"
-        favorites_json = json.loads(self.make_request(url, method='GET'))
+        response = self.make_request(url, method='GET')
+        if not response or response.status_code != requests.codes.ok:
+            return []
+        html = response.text.encode('utf-8').strip()
+        favorites_json = json.loads(html)
         return favorites_json
 
     # Display a piece of media
     def display_random_favorite(self):
+        """ Retrieve the user's favorites and display one of them randomly.
+
+            Note that at present, only the first 20 favorites are returned by the API.
+
+            TODO(gary): It's possible to return the same favorite that is already displayed.
+            Better: get the id of the currently displayed image and ensure the new one is
+            different.
+
+            Return the id of the displayed favorite, else 0.
+        """
         favs = self.favorites()
+        if favs == []:
+            return 0
         fav = random.choice(favs)
         media_id = str(fav['artwork']['id'])
         print media_id
