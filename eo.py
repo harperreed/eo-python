@@ -167,13 +167,30 @@ class ElectricObject:
         path = "/api/beta/user/devices"
         return self.make_JSON_request(path, method='GET')
 
+    def choose_random_item(self, items, excluded_id=None):
+        """Return a random item, avoiding the one with the excluded_id, if given.
+        Args:
+            items: a list of Electric Object's artwork objects.
+
+        Returns:
+            An artwork item, which could have the excluded_id if there's only one choice,
+            or [] if the list is empty.
+        """
+        if not items:
+            return []
+        if len(items) == 1:
+            return items[0]
+        if excluded_id:
+            items = [item for item in items if item['artwork']['id'] != excluded_id]
+        return random.choice(items)
+
     def display_random_favorite(self):
-        """Retrieve the user's favorites and display one of them randomly.
+        """Retrieve the user's favorites and displays one of them randomly.
 
         Note that at present, only the first 20 favorites are returned by the API.
 
-        It's possible to choose the same favorite that is already displayed. To avoid that,
-        first request the displayed image and remove it from the favorites list, if present.
+        A truely random choice could be the one already displayed. To avoid that, first
+        request the displayed image and remove it from the favorites list, if present.
 
         Note:
             This function works on the first device if there are multiple devices associated
@@ -186,16 +203,17 @@ class ElectricObject:
         if not devs:
             print "Error in display_random_favorite: no devices returned."
             return 0
-        current_image = devs[0]["reproduction"]["artwork"]["id"]
-        print "current_image =", current_image
+        device_index = 0
+        current_image_id = devs[device_index]['reproduction']['artwork']['id']
 
         favs = self.favorites()
         if favs == []:
             return 0
-        fav = random.choice(favs)
-        media_id = str(fav['artwork']['id'])
-        print media_id
-        return self.display(media_id)
+        fav_item = self.choose_random_item(favs, current_image_id)
+        if not fav_item:
+            return 0
+        fav_id_str = str(fav_item['artwork']['id'])
+        return self.display(fav_id_str)
 
     def set_url(self, url):
         """Set a URL to be on the display.
