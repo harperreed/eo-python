@@ -117,6 +117,20 @@ class ElectricObject:
         print 'Error: Unknown request type in make_request'
         return None
 
+    def make_JSON_request(self, path, params=None, method='GET'):
+        """Create and make the given request, returning the result as JSON, else []."""
+        response = self.make_request(path, params=params, method=method)
+        if response is None:
+            return []
+        elif response.status_code != requests.codes.ok:
+            print "Error in make_JSON_request(): response", response.status_code, response.reason
+            return []
+        try:
+            return response.json()
+        except:
+            print "Error in make_JSON_request(): unable to parse JSON"
+        return []
+
     def user(self):
         """Obtain the user information."""
         path = "/api/beta/user/"
@@ -146,30 +160,35 @@ class ElectricObject:
             The array of favorites in JSON format or else an empty list.
         """
         path = "/api/beta/user/artworks/favorited"
-        response = self.make_request(path, method='GET')
-        if response is None:
-            return []
-        elif response.status_code != requests.codes.ok:
-            print "Error in favorites(): HTML response", response.status_code, response.reason
-            return []
-        try:
-            return response.json()
-        except:
-            print "Error in favorites(): unable to parse JSON"
-        return []
+        return self.make_JSON_request(path, method='GET')
+
+    def devices(self):
+        """Return a list of devices in JSON format, else []."""
+        path = "/api/beta/user/devices"
+        return self.make_JSON_request(path, method='GET')
 
     def display_random_favorite(self):
         """Retrieve the user's favorites and display one of them randomly.
 
-            Note that at present, only the first 20 favorites are returned by the API.
+        Note that at present, only the first 20 favorites are returned by the API.
 
-            TODO(gary): It's possible to return the same favorite that is already displayed.
-            Better: get the id of the currently displayed image and ensure the new one is
-            different.
+        It's possible to choose the same favorite that is already displayed. To avoid that,
+        first request the displayed image and remove it from the favorites list, if present.
 
-            Returns:
-                The id of the displayed favorite, else 0.
+        Note:
+            This function works on the first device if there are multiple devices associated
+            with the given user.
+
+        Returns:
+            The id of the displayed favorite, else 0.
         """
+        devs = self.devices()
+        if not devs:
+            print "Error in display_random_favorite: no devices returned."
+            return 0
+        current_image = devs[0]["reproduction"]["artwork"]["id"]
+        print "current_image =", current_image
+
         favs = self.favorites()
         if favs == []:
             return 0
@@ -245,9 +264,10 @@ def get_credentials():
 def main():
     """An example main that displays a random favorite."""
 
-    # Display a random favorite.
     credentials = get_credentials()
     eo = ElectricObject(username=credentials["username"], password=credentials["password"])
+
+    # Display a random favorite.
     eo.display_random_favorite()
 
     # Mark a media item as a favorite.
