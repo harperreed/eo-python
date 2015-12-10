@@ -1,8 +1,8 @@
 """
     Here is a wrapper for the *unreleased* electric objects API.
     Built by
-    • Harper Reed (harper@nata2.org) - @harper
-    • Gary Boone (gary.boone@gmail.com) - github.com/GaryBoone
+    - Harper Reed (harper@nata2.org) - @harper
+    - Gary Boone (gary.boone@gmail.com) - github.com/GaryBoone
 
     The Electric Objects API is not yet supported by Electric Objects. It may change or
     stop working at any time.
@@ -25,7 +25,6 @@
 """
 
 from lxml import html
-import json
 import os
 import random
 import requests
@@ -148,11 +147,16 @@ class ElectricObject:
         """
         path = "/api/beta/user/artworks/favorited"
         response = self.make_request(path, method='GET')
-        if not response or response.status_code != requests.codes.ok:
+        if response is None:
             return []
-        html = response.text.encode('utf-8').strip()
-        favorites_json = json.loads(html)
-        return favorites_json
+        elif response.status_code != requests.codes.ok:
+            print "Error in favorites(): HTML response", response.status_code, response.reason
+            return []
+        try:
+            return response.json()
+        except:
+            print "Error in favorites(): unable to parse JSON"
+        return []
 
     def display_random_favorite(self):
         """Retrieve the user's favorites and display one of them randomly.
