@@ -10,8 +10,32 @@ In addition to demonstrating several kinds of API calls, eo-python out-of-the-bo
 
 This code was written by [Harper Reed](https://github.com/harperreed) and [Gary Boone](https://github.com/garyboone).
 
+## Installation
 
-## Implementation
+eo-python depends on:
+
+* [requests](http://docs.python-requests.org/en/latest/)
+* [lxml](http://lxml.de/)
+
+These can be installed with
+
+     $ sudo easy_install pip
+     $ sudo pip install requests
+     $ sudo pip install lxml
+
+#### [Mac OSX only]
+Note: if the *lxml* installation fails on OSX El Capitan with an error like "command 'cc' failed with exit status 1", then try
+
+    $ xcode-select --install
+
+This command does not require XCode to be installed.
+
+#### Running
+
+    $ python eo.py
+
+
+## Design Notes
 
 This code demonstrates how to call Electric Objects' API. That is, the code makes calls to Electric Objects' servers, which then communicate with your EO1 device. It does not directly communicate with your EO1 device.
 
