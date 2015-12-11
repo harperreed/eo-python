@@ -1,4 +1,4 @@
-update_set_url
+# -*- coding: utf-8 -*-
 """
     Here is a wrapper for the *unreleased* electric objects API.
     Built by
