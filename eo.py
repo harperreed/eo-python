@@ -1,8 +1,9 @@
+update_set_url
 """
     Here is a wrapper for the *unreleased* electric objects API.
     Built by
-    - Harper Reed (harper@nata2.org) - @harper
-    - Gary Boone (gary.boone@gmail.com) - github.com/GaryBoone
+    • Harper Reed (harper@nata2.org) - @harper
+    • Gary Boone (gary.boone@gmail.com) - github.com/GaryBoone
 
     The Electric Objects API is not yet supported by Electric Objects. It may change or
     stop working at any time.
