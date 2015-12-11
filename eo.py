@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
     Here is a wrapper for the *unreleased* electric objects API.
     Built by
@@ -181,26 +182,24 @@ class ElectricObject:
         url = "set_url"
         with requests.Session() as s:
             eo_sign = s.get('https://www.electricobjects.com/sign_in')
-            authenticity_token = eo_sign.text.encode('utf-8').strip().split("name=\"authenticity_token\" type=\"hidden\" value=\"")[1].split("\" /></div>")[0]
+            tree = html.fromstring(eo_sign.content)
+            authenticity_token = tree.xpath("string(//input[@name='authenticity_token']/@value)")
             payload = {
                 "user[email]": self.username,
-                "user[password]": self.password
+                "user[password]": self.password,
+                "authenticity_token": authenticity_token
             }
-            payload['authenticity_token'] = authenticity_token
             p = s.post('https://www.electricobjects.com/sign_in', data=payload)
-            if p.status_code == 200:
+            if p.status_code == requests.codes.ok:
                 eo_sign = s.get('https://www.electricobjects.com/set_url')
-                authenticity_token = eo_sign.text.encode('utf-8').strip().split("name=\"authenticity_token\" type=\"hidden\" value=\"")[1].split("\" /></div>")[0]
-                print authenticity_token
+                tree = html.fromstring(eo_sign.content)
+                authenticity_token = tree.xpath("string(//input[@name='authenticity_token']/@value)")
                 params = {
                   "custom_url": url,
                   "authenticity_token": authenticity_token
                 }
                 r = s.post(self.base_url + url, params=params)
-                if r.status_code == 200:
-                    return True
-                else:
-                    return False
+                return r.status_code == requests.codes.ok
 
 
 def get_credentials():
