@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
     Here is a wrapper for the *unreleased* electric objects API.
     Built by
@@ -24,6 +25,7 @@
     Written for Python 2.7.x.
 """
 
+import datetime
 from lxml import html
 import json
 import os
@@ -33,6 +35,11 @@ import requests
 CREDENTIALS_FILE = '.credentials'
 USER_ENV_VAR = 'EO_USER'
 PASSWORD_ENV_VAR = 'EO_PASS'
+
+
+def log(msg):
+    timestamp = datetime.datetime.strftime(datetime.datetime.now(), '%Y-%m-%d_%H:%M:%S')
+    print "{0}: {1}".format(timestamp, msg)
 
 
 class ElectricObject:
@@ -171,8 +178,8 @@ class ElectricObject:
             return 0
         fav = random.choice(favs)
         media_id = str(fav['artwork']['id'])
-        print media_id
-        return self.display(media_id)
+        self.display(media_id)
+        return media_id
 
     def set_url(self, url):
         """Set a URL to be on the display.
@@ -244,7 +251,8 @@ def main():
     # Display a random favorite.
     credentials = get_credentials()
     eo = ElectricObject(username=credentials["username"], password=credentials["password"])
-    eo.display_random_favorite()
+    displayed = eo.display_random_favorite()
+    log("Displayed artwork id " + str(displayed))
 
     # Mark a media item as a favorite.
     # print eo.favorite("5626")
