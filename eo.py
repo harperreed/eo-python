@@ -26,7 +26,6 @@
 """
 
 from lxml import html
-import json
 import os
 import random
 import requests
@@ -119,6 +118,20 @@ class ElectricObject:
         print 'Error: Unknown request type in make_request'
         return None
 
+    def make_JSON_request(self, path, params=None, method='GET'):
+        """Create and make the given request, returning the result as JSON, else []."""
+        response = self.make_request(path, params=params, method=method)
+        if response is None:
+            return []
+        elif response.status_code != requests.codes.ok:
+            print "Error in make_JSON_request(): response", response.status_code, response.reason
+            return []
+        try:
+            return response.json()
+        except:
+            print "Error in make_JSON_request(): unable to parse JSON"
+        return []
+
     def user(self):
         """Obtain the user information."""
         path = "/api/beta/user/"
@@ -148,32 +161,60 @@ class ElectricObject:
             The array of favorites in JSON format or else an empty list.
         """
         path = "/api/beta/user/artworks/favorited"
-        response = self.make_request(path, method='GET')
-        if not response or response.status_code != requests.codes.ok:
+        return self.make_JSON_request(path, method='GET')
+
+    def devices(self):
+        """Return a list of devices in JSON format, else []."""
+        path = "/api/beta/user/devices"
+        return self.make_JSON_request(path, method='GET')
+
+    def choose_random_item(self, items, excluded_id=None):
+        """Return a random item, avoiding the one with the excluded_id, if given.
+        Args:
+            items: a list of Electric Object's artwork objects.
+
+        Returns:
+            An artwork item, which could have the excluded_id if there's only one choice,
+            or [] if the list is empty.
+        """
+        if not items:
             return []
-        html = response.text.encode('utf-8').strip()
-        favorites_json = json.loads(html)
-        return favorites_json
+        if len(items) == 1:
+            return items[0]
+        if excluded_id:
+            items = [item for item in items if item['artwork']['id'] != excluded_id]
+        return random.choice(items)
 
     def display_random_favorite(self):
-        """Retrieve the user's favorites and display one of them randomly.
+        """Retrieve the user's favorites and displays one of them randomly.
 
-            Note that at present, only the first 20 favorites are returned by the API.
+        Note that at present, only the first 20 favorites are returned by the API.
 
-            TODO(gary): It's possible to return the same favorite that is already displayed.
-            Better: get the id of the currently displayed image and ensure the new one is
-            different.
+        A truely random choice could be the one already displayed. To avoid that, first
+        request the displayed image and remove it from the favorites list, if present.
 
-            Returns:
-                The id of the displayed favorite, else 0.
+        Note:
+            This function works on the first device if there are multiple devices associated
+            with the given user.
+
+        Returns:
+            The id of the displayed favorite, else 0.
         """
+        devs = self.devices()
+        if not devs:
+            print "Error in display_random_favorite: no devices returned."
+            return 0
+        device_index = 0
+        current_image_id = devs[device_index]['reproduction']['artwork']['id']
+
         favs = self.favorites()
         if favs == []:
             return 0
-        fav = random.choice(favs)
-        media_id = str(fav['artwork']['id'])
-        print media_id
-        return self.display(media_id)
+        fav_item = self.choose_random_item(favs, current_image_id)
+        if not fav_item:
+            return 0
+        fav_id_str = str(fav_item['artwork']['id'])
+        return self.display(fav_id_str)
 
     def set_url(self, url):
         """Set a URL to be on the display.
@@ -240,9 +281,10 @@ def get_credentials():
 def main():
     """An example main that displays a random favorite."""
 
-    # Display a random favorite.
     credentials = get_credentials()
     eo = ElectricObject(username=credentials["username"], password=credentials["password"])
+
+    # Display a random favorite.
     eo.display_random_favorite()
 
     # Mark a media item as a favorite.
