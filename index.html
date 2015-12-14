@@ -1,0 +1,152 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Eo-python by harperreed</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/github-light.css">
+    <meta name="viewport" content="width=device-width">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1>Eo-python</h1>
+        <p>Electric Objects python library</p>
+
+        <p class="view"><a href="https://github.com/harperreed/eo-python">View the Project on GitHub <small>harperreed/eo-python</small></a></p>
+
+
+        <ul>
+          <li><a href="https://github.com/harperreed/eo-python/zipball/master">Download <strong>ZIP File</strong></a></li>
+          <li><a href="https://github.com/harperreed/eo-python/tarball/master">Download <strong>TAR Ball</strong></a></li>
+          <li><a href="https://github.com/harperreed/eo-python">View On <strong>GitHub</strong></a></li>
+        </ul>
+      </header>
+      <section>
+        <h1>
+<a id="eo-python" class="anchor" href="#eo-python" aria-hidden="true"><span class="octicon octicon-link"></span></a>eo-python</h1>
+
+<p>Unofficial Electric Objects Python Library</p>
+
+<h2>
+<a id="overview" class="anchor" href="#overview" aria-hidden="true"><span class="octicon octicon-link"></span></a>Overview</h2>
+
+<p>The eo-python demonstrates how to control the Electric Objects EO1 using their <em>unsupported</em> beta API and Python. </p>
+
+<p>In addition to demonstrating several kinds of API calls, eo-python out-of-the-box will randomly display one of your favorites. </p>
+
+<p>This code was written by <a href="https://github.com/harperreed">Harper Reed</a> and <a href="https://github.com/garyboone">Gary Boone</a>.</p>
+
+<h2>
+<a id="installation" class="anchor" href="#installation" aria-hidden="true"><span class="octicon octicon-link"></span></a>Installation</h2>
+
+<p>eo-python depends on:</p>
+
+<ul>
+<li><a href="http://docs.python-requests.org/en/latest/">requests</a></li>
+<li><a href="http://lxml.de/">lxml</a></li>
+</ul>
+
+<p>These can be installed with</p>
+
+<pre><code> $ sudo easy_install pip
+ $ sudo pip install requests
+ $ sudo pip install lxml
+</code></pre>
+
+<h4>
+<a id="mac-osx-only" class="anchor" href="#mac-osx-only" aria-hidden="true"><span class="octicon octicon-link"></span></a>[Mac OSX only]</h4>
+
+<p>Note: if the <em>lxml</em> installation fails on OSX El Capitan with an error like "command 'cc' failed with exit status 1", then try</p>
+
+<pre><code>$ xcode-select --install
+</code></pre>
+
+<p>This command does not require XCode to be installed.</p>
+
+<h4>
+<a id="running" class="anchor" href="#running" aria-hidden="true"><span class="octicon octicon-link"></span></a>Running</h4>
+
+<pre><code>$ python eo.py
+</code></pre>
+
+<h2>
+<a id="design-notes" class="anchor" href="#design-notes" aria-hidden="true"><span class="octicon octicon-link"></span></a>Design Notes</h2>
+
+<p>This code demonstrates how to call Electric Objects' API. That is, the code makes calls to Electric Objects' servers, which then communicate with your EO1 device. It does not directly communicate with your EO1 device.</p>
+
+<p>To use it, set your electricobjects.com login credentials. You can do that by inserting them into the code, using environment variables, or creating a .credentials file in the same directory as the code. See the <em>get_credentials()</em> function in eo.py for details.</p>
+
+<p>As configured, this module will display a random image from the favorites you marked on electricobjects.com each time it is run. It can be used to implement a long-requested feature of the EO1: automatic rotation among favorites. To do so, set up your operating system to run this code periodically, say every few hours. For more on this topic, see Automation below.</p>
+
+<h2>
+<a id="limitations" class="anchor" href="#limitations" aria-hidden="true"><span class="octicon octicon-link"></span></a>Limitations</h2>
+
+<ul>
+<li>Electric Objects' API is unsupported and my disappear at any time.</li>
+<li>Due a limitation of the API, or our understanding of it, only the first 20 items are returned by API calls that return lists, such as favorites and devices. So the randomized image is picked among only the first 20 images shown on your favorites page on electricobjects.com.</li>
+<li>The <em>set_url()</em> function does not currently work correctly.</li>
+<li>The code does not demonstrate all of the API calls and usage, but only ones we found by experimentation.</li>
+</ul>
+
+<h2>
+<a id="code-notes" class="anchor" href="#code-notes" aria-hidden="true"><span class="octicon octicon-link"></span></a>Code Notes</h2>
+
+<ul>
+<li>Written for Python 2.7.x. </li>
+<li>Tested on OSX El Capitan.</li>
+<li>Usage: $ python eo.py</li>
+</ul>
+
+<h2>
+<a id="coding-example" class="anchor" href="#coding-example" aria-hidden="true"><span class="octicon octicon-link"></span></a>Coding Example</h2>
+
+<div class="highlight highlight-source-python"><pre>
+    credentials <span class="pl-k">=</span> get_credentials()
+    eo <span class="pl-k">=</span> ElectricObject(<span class="pl-smi">username</span><span class="pl-k">=</span>credentials[<span class="pl-s"><span class="pl-pds">"</span>username<span class="pl-pds">"</span></span>],
+                        <span class="pl-smi">password</span><span class="pl-k">=</span>credentials[<span class="pl-s"><span class="pl-pds">"</span>password<span class="pl-pds">"</span></span>])
+
+    <span class="pl-c"># Display a random favorite.</span>
+    eo.display_random_favorite()
+
+    <span class="pl-c"># Mark a media item as a favorite.</span>
+    <span class="pl-k">print</span> eo.favorite(<span class="pl-s"><span class="pl-pds">"</span>5626<span class="pl-pds">"</span></span>)
+    <span class="pl-c"># Now unfavorite it.</span>
+    <span class="pl-k">print</span> eo.unfavorite(<span class="pl-s"><span class="pl-pds">"</span>5626<span class="pl-pds">"</span></span>)
+
+    <span class="pl-c"># Display a media item by id.</span>
+    <span class="pl-k">print</span> eo.display(<span class="pl-s"><span class="pl-pds">"</span>1136<span class="pl-pds">"</span></span>)
+
+    <span class="pl-c"># List user's devices</span>
+    <span class="pl-k">print</span> eo.devices()
+</pre></div>
+
+<h2>
+<a id="automation" class="anchor" href="#automation" aria-hidden="true"><span class="octicon octicon-link"></span></a>Automation</h2>
+
+<p>The script is designed to display a new favorite on the EO1 each time it is run. To automatically update your EO1 artwork periodically, use your operating system's standard method for periodically running scripts. On Linux, it's cron. On Macs, it's launchd.</p>
+
+<h4>
+<a id="mac-osx-only-1" class="anchor" href="#mac-osx-only-1" aria-hidden="true"><span class="octicon octicon-link"></span></a>[Mac OSX only]</h4>
+
+<p>The script eo.py can be configured to run under OSX's launchd facility. Help for launchd can be found on the web. For example, see <a href="http://launchd.info/">launchd.info</a>, which includes examples for the easy-to-use <a href="http://www.soma-zone.com/LaunchControl/">LaunchControl</a> application.</p>
+
+<h2>
+<a id="license" class="anchor" href="#license" aria-hidden="true"><span class="octicon octicon-link"></span></a>License</h2>
+
+<p>The code is available at GitHub <a href="https://github.com/harperreed/eo-python">HarperReed/eo-python</a> under the <a href="http://opensource.org/licenses/mit-license.php">MIT license</a>.</p>
+      </section>
+      <footer>
+        <p>This project is maintained by <a href="https://github.com/harperreed">harperreed</a></p>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+    <script src="javascripts/scale.fix.js"></script>
+    
+  </body>
+</html>
