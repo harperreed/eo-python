@@ -25,6 +25,7 @@
     Written for Python 2.7.x.
 """
 
+import datetime
 from lxml import html
 import os
 import random
@@ -33,6 +34,11 @@ import requests
 CREDENTIALS_FILE = '.credentials'
 USER_ENV_VAR = 'EO_USER'
 PASSWORD_ENV_VAR = 'EO_PASS'
+
+
+def log(msg):
+    timestamp = datetime.datetime.strftime(datetime.datetime.now(), '%Y-%m-%d_%H:%M:%S')
+    print "{0}: {1}".format(timestamp, msg)
 
 
 class ElectricObject:
@@ -213,8 +219,9 @@ class ElectricObject:
         fav_item = self.choose_random_item(favs, current_image_id)
         if not fav_item:
             return 0
-        fav_id_str = str(fav_item['artwork']['id'])
-        return self.display(fav_id_str)
+        fav_id = fav_item['artwork']['id']
+        self.display(str(fav_id))
+        return fav_id
 
     def set_url(self, url):
         """Set a URL to be on the display.
@@ -283,9 +290,8 @@ def main():
 
     credentials = get_credentials()
     eo = ElectricObject(username=credentials["username"], password=credentials["password"])
-
-    # Display a random favorite.
-    eo.display_random_favorite()
+    displayed = eo.display_random_favorite()
+    log("Displayed artwork id " + str(displayed))
 
     # Mark a media item as a favorite.
     # print eo.favorite("5626")
