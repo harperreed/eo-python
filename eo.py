@@ -31,24 +31,24 @@ import os
 import random
 import requests
 
-CREDENTIALS_FILE = '.credentials'
-USER_ENV_VAR = 'EO_USER'
-PASSWORD_ENV_VAR = 'EO_PASS'
+CREDENTIALS_FILE = ".credentials"
+USER_ENV_VAR = "EO_USER"
+PASSWORD_ENV_VAR = "EO_PASS"
 
 
 def log(msg):
-    timestamp = datetime.datetime.strftime(datetime.datetime.now(), '%Y-%m-%d_%H:%M:%S')
+    timestamp = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d_%H:%M:%S")
     print "{0}: {1}".format(timestamp, msg)
 
 
 class ElectricObject:
-    """The ElectricObject provides the functions for the electric objects API calls.
+    """The ElectricObject class provides the functions for the Electric Objects API calls.
 
     It maintains the state of credentials and the currently signed-in session.
     Usage: instantiate the object with credentials, then make one or more API calls
     with the object.
     """
-    base_url = 'https://www.electricobjects.com/'
+    base_url = "https://www.electricobjects.com/"
 
     def __init__(self, username, password):
         """Upon initialization, set the credentials. But don't attempt to sign-in until
@@ -69,9 +69,9 @@ class ElectricObject:
         self.signed_in_session = None
         try:
             session = requests.Session()
-            signin_response = session.get('https://www.electricobjects.com/sign_in')
+            signin_response = session.get("https://www.electricobjects.com/sign_in")
             if signin_response.status_code != requests.codes.ok:
-                print 'Error: unable to sign in. Status: ', signin_response.status_code, ", response: ", signin_response.text
+                print "Error: unable to sign in. Status: ", signin_response.status_code, ", response: ", signin_response.text
                 return
             tree = html.fromstring(signin_response.content)
             authenticity_token = tree.xpath("string(//input[@name='authenticity_token']/@value)")
@@ -82,9 +82,9 @@ class ElectricObject:
                 "user[password]": self.password,
                 "authenticity_token": authenticity_token
             }
-            p = session.post('https://www.electricobjects.com/sign_in', data=payload)
+            p = session.post("https://www.electricobjects.com/sign_in", data=payload)
             if p.status_code != requests.codes.ok:
-                print 'Error: unable to sign in. Status: ', p.status_code, ", response: ", requests.text
+                print "Error: unable to sign in. Status: ", p.status_code, ", response: ", requests.text
                 return
             self.signed_in_session = session
         except Exception as e:
@@ -94,7 +94,7 @@ class ElectricObject:
         """ Return true if we have a valid signed-in session. """
         return self.signed_in_session is not None
 
-    def make_request(self, path, params=None, method='GET'):
+    def make_request(self, path, params=None, method="GET"):
         """Create a request of the given type and make the request to the Electric Objects API.
 
         Args:
@@ -121,10 +121,10 @@ class ElectricObject:
         elif method == "DELETE":
             return self.signed_in_session.delete(url)
 
-        print 'Error: Unknown request type in make_request'
+        print "Error: Unknown request type in make_request"
         return None
 
-    def make_JSON_request(self, path, params=None, method='GET'):
+    def make_JSON_request(self, path, params=None, method="GET"):
         """Create and make the given request, returning the result as JSON, else []."""
         response = self.make_request(path, params=params, method=method)
         if response is None:
@@ -141,22 +141,22 @@ class ElectricObject:
     def user(self):
         """Obtain the user information."""
         path = "/api/beta/user/"
-        return self.make_request(path, method='GET')
+        return self.make_request(path, method="GET")
 
     def favorite(self, media_id):
         """Set a media as a favorite by id."""
         path = "/api/beta/user/artworks/favorited/" + media_id
-        return self.make_request(path, method='PUT')
+        return self.make_request(path, method="PUT")
 
     def unfavorite(self, media_id):
         """Remove a media as a favorite by id."""
         path = "/api/beta/user/artworks/favorited/" + media_id
-        return self.make_request(path, method='DELETE')
+        return self.make_request(path, method="DELETE")
 
     def display(self, media_id):
         """Display media by id."""
         path = "/api/beta/user/artworks/displayed/" + media_id
-        return self.make_request(path, method='PUT')
+        return self.make_request(path, method="PUT")
 
     def favorites(self):
         """Return the user's list of favorites in JSON else [].
@@ -167,17 +167,17 @@ class ElectricObject:
             The array of favorites in JSON format or else an empty list.
         """
         path = "/api/beta/user/artworks/favorited"
-        return self.make_JSON_request(path, method='GET')
+        return self.make_JSON_request(path, method="GET")
 
     def devices(self):
         """Return a list of devices in JSON format, else []."""
         path = "/api/beta/user/devices"
-        return self.make_JSON_request(path, method='GET')
+        return self.make_JSON_request(path, method="GET")
 
     def choose_random_item(self, items, excluded_id=None):
         """Return a random item, avoiding the one with the excluded_id, if given.
         Args:
-            items: a list of Electric Object's artwork objects.
+            items: a list of Electric Objects artwork objects.
 
         Returns:
             An artwork item, which could have the excluded_id if there's only one choice,
@@ -188,7 +188,7 @@ class ElectricObject:
         if len(items) == 1:
             return items[0]
         if excluded_id:
-            items = [item for item in items if item['artwork']['id'] != excluded_id]
+            items = [item for item in items if item["artwork"]["id"] != excluded_id]
         return random.choice(items)
 
     def display_random_favorite(self):
@@ -211,7 +211,7 @@ class ElectricObject:
             print "Error in display_random_favorite: no devices returned."
             return 0
         device_index = 0
-        current_image_id = devs[device_index]['reproduction']['artwork']['id']
+        current_image_id = devs[device_index]["reproduction"]["artwork"]["id"]
 
         favs = self.favorites()
         if favs == []:
@@ -219,7 +219,7 @@ class ElectricObject:
         fav_item = self.choose_random_item(favs, current_image_id)
         if not fav_item:
             return 0
-        fav_id = fav_item['artwork']['id']
+        fav_id = fav_item["artwork"]["id"]
         self.display(str(fav_id))
         return fav_id
 
@@ -229,7 +229,7 @@ class ElectricObject:
         """
         url = "set_url"
         with requests.Session() as s:
-            eo_sign = s.get('https://www.electricobjects.com/sign_in')
+            eo_sign = s.get("https://www.electricobjects.com/sign_in")
             tree = html.fromstring(eo_sign.content)
             authenticity_token = tree.xpath("string(//input[@name='authenticity_token']/@value)")
             payload = {
@@ -237,9 +237,9 @@ class ElectricObject:
                 "user[password]": self.password,
                 "authenticity_token": authenticity_token
             }
-            p = s.post('https://www.electricobjects.com/sign_in', data=payload)
+            p = s.post("https://www.electricobjects.com/sign_in", data=payload)
             if p.status_code == requests.codes.ok:
-                eo_sign = s.get('https://www.electricobjects.com/set_url')
+                eo_sign = s.get("https://www.electricobjects.com/set_url")
                 tree = html.fromstring(eo_sign.content)
                 authenticity_token = tree.xpath("string(//input[@name='authenticity_token']/@value)")
                 params = {
@@ -269,14 +269,14 @@ def get_credentials():
     Returns:
         A dictionary with key/values for the username and password.
     """
-    username = ''  # You can set them here if you don't plan on uploading this code to GitHub.
-    password = ''
+    username = ""  # You can set them here if you don"t plan on uploading this code to GitHub.
+    password = ""
 
     username = os.environ[USER_ENV_VAR] if USER_ENV_VAR in os.environ else username
     password = os.environ[PASSWORD_ENV_VAR] if PASSWORD_ENV_VAR in os.environ else password
 
     try:
-        with open(CREDENTIALS_FILE, 'r') as f:
+        with open(CREDENTIALS_FILE, "r") as f:
             username = next(f).strip()
             password = next(f).strip()
     except:
