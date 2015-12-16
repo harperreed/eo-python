@@ -16,9 +16,8 @@
     To use as is, you need to set your electricobjects.com login credentials. See the
     get_credentials() function for how to do so.
 
-    Note, due a limitation of the API, or our understanding of it, only the first 20 favorites
-    are returned by the API. So the randomized image is picked among only the first
-    20 images shown on your favorites page on electricobjects.com.
+    Randomized images are picked among the first 200 images shown on your favorites page on
+    electricobjects.com. Change MAX_FAVORITES_FOR_DISPLAY below to adjust this limit.
 
     Usage: $ python eo.py
 
@@ -34,6 +33,12 @@ import requests
 CREDENTIALS_FILE = ".credentials"
 USER_ENV_VAR = "EO_USER"
 PASSWORD_ENV_VAR = "EO_PASS"
+
+# The maximum number of favorites to consider for randomly displaying one.
+MAX_FAVORITES_FOR_DISPLAY = 200
+
+# The number of favorites to pull per request
+NUM_FAVORITES_PER_REQUEST = 30
 
 
 def log(msg):
@@ -161,13 +166,30 @@ class ElectricObject:
     def favorites(self):
         """Return the user's list of favorites in JSON else [].
 
-        Note: At present, the API only returns the first 20 favorites.
-
         Returns:
-            The array of favorites in JSON format or else an empty list.
+            An array of up to NUM_FAVORITES_PER_REQUEST favorites in JSON format
+            or else an empty list.
         """
         path = "/api/beta/user/artworks/favorited"
-        return self.make_JSON_request(path, method="GET")
+
+        offset = 0
+        favorites = []
+        while True:
+            params = {
+              "limit": NUM_FAVORITES_PER_REQUEST,
+              "offset": offset
+            }
+            result_JSON = self.make_JSON_request(path, method="GET", params=params)
+            if not result_JSON:
+                break
+            favorites.extend(result_JSON)
+            if len(result_JSON) < NUM_FAVORITES_PER_REQUEST:  # last page
+                break
+            if len(favorites) > MAX_FAVORITES_FOR_DISPLAY:  # too many
+                favorites = favorites[:MAX_FAVORITES_FOR_DISPLAY]
+                break
+            offset += NUM_FAVORITES_PER_REQUEST
+        return favorites
 
     def devices(self):
         """Return a list of devices in JSON format, else []."""
@@ -214,6 +236,7 @@ class ElectricObject:
         current_image_id = devs[device_index]["reproduction"]["artwork"]["id"]
 
         favs = self.favorites()
+        print "Found", len(favs), "favorites."
         if favs == []:
             return 0
         fav_item = self.choose_random_item(favs, current_image_id)
