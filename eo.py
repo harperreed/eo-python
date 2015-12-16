@@ -76,7 +76,8 @@ class ElectricObject:
             session = requests.Session()
             signin_response = session.get("https://www.electricobjects.com/sign_in")
             if signin_response.status_code != requests.codes.ok:
-                print "Error: unable to sign in. Status: ", signin_response.status_code, ", response: ", signin_response.text
+                log("Error: unable to sign in. Status: {0}, response: {1}".
+                    format(signin_response.status_code, signin_response.text))
                 return
             tree = html.fromstring(signin_response.content)
             authenticity_token = tree.xpath("string(//input[@name='authenticity_token']/@value)")
@@ -89,11 +90,12 @@ class ElectricObject:
             }
             p = session.post("https://www.electricobjects.com/sign_in", data=payload)
             if p.status_code != requests.codes.ok:
-                print "Error: unable to sign in. Status: ", p.status_code, ", response: ", requests.text
+                log("Error: unable to sign in. Status: {0}, response: {1}".
+                    format(signin_response.status_code, signin_response.text))
                 return
             self.signed_in_session = session
         except Exception as e:
-            print e
+            log("Exception in signin: " + str(e))
 
     def signed_in(self):
         """ Return true if we have a valid signed-in session. """
@@ -126,7 +128,7 @@ class ElectricObject:
         elif method == "DELETE":
             return self.signed_in_session.delete(url)
 
-        print "Error: Unknown request type in make_request"
+        log("Error: Unknown request type in make_request")
         return None
 
     def make_JSON_request(self, path, params=None, method="GET"):
@@ -135,12 +137,13 @@ class ElectricObject:
         if response is None:
             return []
         elif response.status_code != requests.codes.ok:
-            print "Error in make_JSON_request(): response", response.status_code, response.reason
+            log("Error in make_JSON_request(). Response: {0} {1}".
+                format(response.status_code, response.reason))
             return []
         try:
             return response.json()
         except:
-            print "Error in make_JSON_request(): unable to parse JSON"
+            log("Error in make_JSON_request(): unable to parse JSON")
         return []
 
     def user(self):
@@ -230,13 +233,12 @@ class ElectricObject:
         """
         devs = self.devices()
         if not devs:
-            print "Error in display_random_favorite: no devices returned."
+            log("Error in display_random_favorite: no devices returned.")
             return 0
         device_index = 0
         current_image_id = devs[device_index]["reproduction"]["artwork"]["id"]
 
         favs = self.favorites()
-        print "Found", len(favs), "favorites."
         if favs == []:
             return 0
         fav_item = self.choose_random_item(favs, current_image_id)
