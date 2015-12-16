@@ -29,6 +29,7 @@ from lxml import html
 import os
 import random
 import requests
+import time
 
 CREDENTIALS_FILE = ".credentials"
 USER_ENV_VAR = "EO_USER"
@@ -37,8 +38,12 @@ PASSWORD_ENV_VAR = "EO_PASS"
 # The maximum number of favorites to consider for randomly displaying one.
 MAX_FAVORITES_FOR_DISPLAY = 200
 
-# The number of favorites to pull per request
+# The number of favorites to pull per request.
 NUM_FAVORITES_PER_REQUEST = 30
+
+# BEST PRACTICE: don't hit server at maximum rate.
+# Minimum time between requests.
+MIN_REQUEST_INTERVAL = 0.75  # seconds, float
 
 
 def log(msg):
@@ -62,6 +67,7 @@ class ElectricObject:
         self.username = username
         self.password = password
         self.signed_in_session = None
+        self.last_request_time = 0
 
     def signin(self):
         """ Sign in. If successful, set self.signed_in_session to the session for reuse in
@@ -74,6 +80,7 @@ class ElectricObject:
         self.signed_in_session = None
         try:
             session = requests.Session()
+            self.check_request_rate()
             signin_response = session.get("https://www.electricobjects.com/sign_in")
             if signin_response.status_code != requests.codes.ok:
                 log("Error: unable to sign in. Status: {0}, response: {1}".
@@ -88,6 +95,7 @@ class ElectricObject:
                 "user[password]": self.password,
                 "authenticity_token": authenticity_token
             }
+            self.check_request_rate()
             p = session.post("https://www.electricobjects.com/sign_in", data=payload)
             if p.status_code != requests.codes.ok:
                 log("Error: unable to sign in. Status: {0}, response: {1}".
@@ -100,6 +108,19 @@ class ElectricObject:
     def signed_in(self):
         """ Return true if we have a valid signed-in session. """
         return self.signed_in_session is not None
+
+    def check_request_rate(self):
+        """ Are we making requests too fast? If so, pause.
+
+            Specifically, check the current time against the last request time. If
+            less than MIN_REQUEST_INTERVAL, sleep the remaining time.
+
+            TODO: This function pauses the whole program. Improvement: create a
+            request queue that handles request asynchronously.
+        """
+        interval = time.clock() - self.last_request_time
+        if interval < MIN_REQUEST_INTERVAL:
+            time.sleep(MIN_REQUEST_INTERVAL - interval)
 
     def make_request(self, path, params=None, method="GET"):
         """Create a request of the given type and make the request to the Electric Objects API.
@@ -118,6 +139,7 @@ class ElectricObject:
                 return None
 
         url = self.base_url + path
+        self.check_request_rate()
         # TODO(gary): These requests should retry in case the sign-in has expired.
         if method == "GET":
             return self.signed_in_session.get(url, params=params)
