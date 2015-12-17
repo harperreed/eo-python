@@ -93,6 +93,52 @@ class ElectricObject:
         self.last_request_time = 0
         self.last_signin_time = 0
 
+    def get_authorization_token(self):
+        """Request, parse, and return the authorization token else a blank string."""
+        authenticity_token = ""
+
+        # Request the page with the token.
+        self.check_request_rate()
+        url = self.base_url + "sign_in"
+        signin_response = self.request_with_retries(url)
+        if not signin_response or signin_response.status_code != requests.codes.ok:
+            log("Error: unable to sign in. Status: {0}, response: {1}".
+                format(signin_response.status_code, signin_response.text))
+            return ""
+
+        # Parse out the token.
+        try:
+            tree = html.fromstring(signin_response.content)
+            authenticity_token = tree.xpath("string(//input[@name='authenticity_token']/@value)")
+        except Exception as e:
+            log("Error: problem parsing authorization token: " + str(e))
+        return authenticity_token
+
+    def request_signin(self, authenticity_token):
+        """ Use the given authenticity_token to request a sign-in from the EO web server.
+        Return True on succcess.
+        """
+        if not authenticity_token:
+            return False
+
+        url = self.base_url + "sign_in"
+        payload = {
+            "user[email]": self.username,
+            "user[password]": self.password,
+            "authenticity_token": authenticity_token
+        }
+        self.check_request_rate()
+        response = self.request_with_retries(url, method="POST", data=payload)
+        if response and response.status_code == requests.codes.ok:
+            return True
+
+        if not response:
+            log("Error: unable to sign in.")
+        else:
+            log("Error: unable to sign in. Status: {0}, response: {1}".
+                format(response.status_code, response.text))
+        return False
+
     def signin(self):
         """ Sign in. If successful, set self.signed_in_session to the session for reuse in
         subsequent requests. If not, set self.signed_in_session to None.
@@ -101,34 +147,13 @@ class ElectricObject:
         requests, the sign-in may expire after some time. So requests that fail should
         try signing in again.
         """
-        self.signed_in_session = None
-        try:
-            session = requests.Session()
-            self.check_request_rate()
-            signin_response = session.get(self.base_url + "sign_in")
-            if signin_response.status_code != requests.codes.ok:
-                log("Error: unable to sign in. Status: {0}, response: {1}".
-                    format(signin_response.status_code, signin_response.text))
-                return
-            tree = html.fromstring(signin_response.content)
-            authenticity_token = tree.xpath("string(//input[@name='authenticity_token']/@value)")
-            if authenticity_token == "":
-                return
-            payload = {
-                "user[email]": self.username,
-                "user[password]": self.password,
-                "authenticity_token": authenticity_token
-            }
-            self.check_request_rate()
-            p = session.post(self.base_url + "sign_in", data=payload)
-            if p.status_code != requests.codes.ok:
-                log("Error: unable to sign in. Status: {0}, response: {1}".
-                    format(signin_response.status_code, signin_response.text))
-                return
-            self.last_signin_time = time.clock()
-            self.signed_in_session = session
-        except Exception as e:
-            log("Exception in signin: " + str(e))
+        self.signed_in_session = requests.Session()
+        authenticity_token = self.get_authorization_token()
+        success = self.request_signin(authenticity_token)
+        if not success:
+            self.signed_in_session = None
+            return
+        self.last_signin_time = time.clock()
 
     def signed_in(self):
         """ Return true if we have a valid signed-in session. """
@@ -158,23 +183,24 @@ class ElectricObject:
         if interval < MIN_REQUEST_INTERVAL:
             time.sleep(MIN_REQUEST_INTERVAL - interval)
 
-    def execute_request(self, url, params=None, method="GET"):
+    def execute_request(self, url, params=None, method="GET", data=None):
         """ Request the given URL with the given method and parameters.
 
         Args:
             url: The URL to call.
             params: The optional parameters.
             method: The HTTP request type {GET, POST, PUT, DELETE}.
+            data: The data to send for POST requests.
 
         Returns:
-            The request result or None.
+            The server response or None.
         """
         self.check_request_rate()
         try:
             if method == "GET":
                 return self.signed_in_session.get(url, params=params)
             elif method == "POST":
-                return self.signed_in_session.post(url, params=params)
+                return self.signed_in_session.post(url, params=params, data=data)
             elif method == "PUT":
                 return self.signed_in_session.put(url)
             elif method == "DELETE":
@@ -185,8 +211,8 @@ class ElectricObject:
             log("Error in making HTTP request: {0}".format(e))
         return None
 
-    def make_request(self, endpoint, params=None, method="GET", path_append=None):
-        """Create a request of the given type and make the request to the Electric Objects API.
+    def request_with_retries(self, url, params=None, method="GET", data=None):
+        """ Call the given request, returning the response or None if error.
 
         Retry the request up to NUM_RETRIES times if:
 
@@ -199,30 +225,19 @@ class ElectricObject:
         that could benefit from retries, so are returned immediately.
 
         Args:
-            endpoint: The id of the request target API path in self.endpoints.
-            params: The URL parameters.
+            url: The URL to call.
+            params: The optional parameters.
             method: The HTTP request type {GET, POST, PUT, DELETE}.
-            path_append: An additional string to add to the URL, such as an ID.
+            data: The data to send for POST requests.
 
         Returns:
-            The request result or None.
+            The server response or None.
         """
-        # Check sign-in
-        signin_ok = self.check_signin_status()
-        if not signin_ok:
-            return None
-
-        # Build URL.
-        url = self.base_url + self.api_version_path + self.endpoints[endpoint]
-        if path_append:
-            url += path_append
-
-        # Call API with retries and exponential backoff.
         retries = 0
         delay = INITIAL_RETRY_DELAY
         while True:
             pass
-            response = self.execute_request(url, params=params, method=method)
+            response = self.execute_request(url, params=params, method=method, data=data)
 
             if response:
                 if response.status_code < 500:
@@ -249,6 +264,31 @@ class ElectricObject:
 
         log("Error: Maximum HTTP request attempts ({0}) exceeded.".format(NUM_RETRIES + 1))
         return None
+
+    def make_request(self, endpoint, params=None, method="GET", path_append=None):
+        """Create a request of the given type and make the request to the Electric Objects API.
+
+        Args:
+            endpoint: The id of the request target API path in self.endpoints.
+            params: The URL parameters.
+            method: The HTTP request type {GET, POST, PUT, DELETE}.
+            path_append: An additional string to add to the URL, such as an ID.
+
+        Returns:
+            The request result or None.
+        """
+        # Check sign-in
+        signin_ok = self.check_signin_status()
+        if not signin_ok:
+            return None
+
+        # Build URL.
+        url = self.base_url + self.api_version_path + self.endpoints[endpoint]
+        if path_append:
+            url += path_append
+
+        # Call API with retries and exponential backoff.
+        return self.request_with_retries(url, method=method, params=params)
 
     def make_JSON_request(self, endpoint, params=None, method="GET", path_append=None):
         """Create and make the given request, returning the result as JSON, else []."""
