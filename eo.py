@@ -45,6 +45,20 @@ NUM_FAVORITES_PER_REQUEST = 30
 # Minimum time between requests.
 MIN_REQUEST_INTERVAL = 0.75  # seconds, float
 
+# How often should we sign-in?
+SIGNIN_INTERVAL_IN_HOURS = 4  # hours
+
+# BEST PRACTICE: If you do retries, back them off exponentially. If the server is down
+# or struggling to come back up, you'll avoid creating a stampede of clients retrying
+# their requests.
+# What's the first retry delay? If more retries are needed, double each delay.
+INITIAL_RETRY_DELAY = 4.0  # seconds, float
+
+# In this code, if there's a missed update, we can just wait until the next scheduled update
+# to try again. So we don't need to retry many times.
+# The number of retry attempts.
+NUM_RETRIES = 4
+
 
 def log(msg):
     timestamp = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d_%H:%M:%S")
@@ -77,6 +91,7 @@ class ElectricObject:
         self.password = password
         self.signed_in_session = None
         self.last_request_time = 0
+        self.last_signin_time = 0
 
     def signin(self):
         """ Sign in. If successful, set self.signed_in_session to the session for reuse in
@@ -110,6 +125,7 @@ class ElectricObject:
                 log("Error: unable to sign in. Status: {0}, response: {1}".
                     format(signin_response.status_code, signin_response.text))
                 return
+            self.last_signin_time = time.clock()
             self.signed_in_session = session
         except Exception as e:
             log("Exception in signin: " + str(e))
@@ -118,51 +134,120 @@ class ElectricObject:
         """ Return true if we have a valid signed-in session. """
         return self.signed_in_session is not None
 
+    def check_signin_status(self):
+        """Check if think we're signed in or whether enough time has passed that we
+        should sign in again.
+        """
+        time_since_signin = time.clock() - self.last_signin_time
+        if not self.signed_in() or time_since_signin > SIGNIN_INTERVAL_IN_HOURS * 3600.0:
+            self.signin()
+            if not self.signed_in():
+                return False
+        return True
+
     def check_request_rate(self):
         """ Are we making requests too fast? If so, pause.
 
-            Specifically, check the current time against the last request time. If
-            less than MIN_REQUEST_INTERVAL, sleep the remaining time.
+        Specifically, check the current time against the last request time. If
+        less than MIN_REQUEST_INTERVAL, sleep the remaining time.
 
-            TODO: This function pauses the whole program. Improvement: create a
-            request queue that handles request asynchronously.
+        TODO: This function pauses the whole program. Improvement: create a
+        request queue that handles request asynchronously.
         """
         interval = time.clock() - self.last_request_time
         if interval < MIN_REQUEST_INTERVAL:
             time.sleep(MIN_REQUEST_INTERVAL - interval)
 
-    def make_request(self, endpoint, params=None, method="GET", path_append=None):
-        """Create a request of the given type and make the request to the Electric Objects API.
+    def execute_request(self, url, params=None, method="GET"):
+        """ Request the given URL with the given method and parameters.
 
         Args:
-            endpoint: The id of the request target API endpoint in self.endpoints.
-            params: The URL parameters.
+            url: The URL to call.
+            params: The optional parameters.
             method: The HTTP request type {GET, POST, PUT, DELETE}.
 
         Returns:
             The request result or None.
         """
-        if not self.signed_in():
-            self.signin()
-            if not self.signed_in():
-                return None
+        self.check_request_rate()
+        try:
+            if method == "GET":
+                return self.signed_in_session.get(url, params=params)
+            elif method == "POST":
+                return self.signed_in_session.post(url, params=params)
+            elif method == "PUT":
+                return self.signed_in_session.put(url)
+            elif method == "DELETE":
+                return self.signed_in_session.delete(url)
+            else:
+                log("Unknown request type: {0}".format(method))
+        except Exception as e:
+            log("Error in making HTTP request: {0}".format(e))
+        return None
 
+    def make_request(self, endpoint, params=None, method="GET", path_append=None):
+        """Create a request of the given type and make the request to the Electric Objects API.
+
+        Retry the request up to NUM_RETRIES times if:
+
+        1) execute_request() returns None, which would indicate a problem caught the request
+        library. These would include network connectivity issues or request timeouts.
+
+        OR
+
+        2) the server returns a 50X response code. Note that 30X, and 40X responses are not errors
+        that could benefit from retries, so are returned immediately.
+
+        Args:
+            endpoint: The id of the request target API path in self.endpoints.
+            params: The URL parameters.
+            method: The HTTP request type {GET, POST, PUT, DELETE}.
+            path_append: An additional string to add to the URL, such as an ID.
+
+        Returns:
+            The request result or None.
+        """
+        # Check sign-in
+        signin_ok = self.check_signin_status()
+        if not signin_ok:
+            return None
+
+        # Build URL.
         url = self.base_url + self.api_version_path + self.endpoints[endpoint]
         if path_append:
             url += path_append
 
-        self.check_request_rate()
-        # TODO(gary): These requests should retry in case the sign-in has expired.
-        if method == "GET":
-            return self.signed_in_session.get(url, params=params)
-        elif method == "POST":
-            return self.signed_in_session.post(url, params=params)
-        elif method == "PUT":
-            return self.signed_in_session.put(url)
-        elif method == "DELETE":
-            return self.signed_in_session.delete(url)
+        # Call API with retries and exponential backoff.
+        retries = 0
+        delay = INITIAL_RETRY_DELAY
+        while True:
+            pass
+            response = self.execute_request(url, params=params, method=method)
 
-        log("Error: Unknown request type in make_request")
+            if response:
+                if response.status_code < 500:
+                    return response
+                else:
+                    log("Error from API server. Response: {0} {1}.".
+                        format(response.status_code, response.reason))
+
+            if retries == NUM_RETRIES:
+                break
+
+            # retries + 1: Use natural numbers for readability.
+            log("Error: Failed request {0} of {1}. Retrying in {2} seconds.".
+                format(retries + 1, NUM_RETRIES + 1, delay))
+
+            # Exponential backoff: Double the delay between each retry, or equivilently,
+            #     delay = INITIAL_RETRY_DELAY * 2 ** retries
+            # The constant, 2 in this case, or doubling each delay, doesn't matter so long as the
+            # delay increases significantly with each retry, allowing congestion at the server
+            # to disperse.
+            delay *= 2
+            retries += 1
+            time.sleep(delay)
+
+        log("Error: Maximum HTTP request attempts ({0}) exceeded.".format(NUM_RETRIES + 1))
         return None
 
     def make_JSON_request(self, endpoint, params=None, method="GET", path_append=None):
