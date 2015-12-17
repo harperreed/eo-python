@@ -16,9 +16,8 @@
     To use as is, you need to set your electricobjects.com login credentials. See the
     get_credentials() function for how to do so.
 
-    Note, due a limitation of the API, or our understanding of it, only the first 20 favorites
-    are returned by the API. So the randomized image is picked among only the first
-    20 images shown on your favorites page on electricobjects.com.
+    Randomized images are picked among the first 200 images shown on your favorites page on
+    electricobjects.com. Change MAX_FAVORITES_FOR_DISPLAY below to adjust this limit.
 
     Usage: $ python eo.py
 
@@ -30,10 +29,21 @@ from lxml import html
 import os
 import random
 import requests
+import time
 
 CREDENTIALS_FILE = ".credentials"
 USER_ENV_VAR = "EO_USER"
 PASSWORD_ENV_VAR = "EO_PASS"
+
+# The maximum number of favorites to consider for randomly displaying one.
+MAX_FAVORITES_FOR_DISPLAY = 200
+
+# The number of favorites to pull per request.
+NUM_FAVORITES_PER_REQUEST = 30
+
+# BEST PRACTICE: don't hit server at maximum rate.
+# Minimum time between requests.
+MIN_REQUEST_INTERVAL = 0.75  # seconds, float
 
 
 def log(msg):
@@ -48,7 +58,16 @@ class ElectricObject:
     Usage: instantiate the object with credentials, then make one or more API calls
     with the object.
     """
+
+    # Class variables
     base_url = "https://www.electricobjects.com/"
+    api_version_path = "api/v2/"
+    endpoints = {
+        "user": "user/",
+        "devices": "user/devices/",
+        "displayed": "user/artworks/displayed/",
+        "favorited": "user/artworks/favorited/"
+        }
 
     def __init__(self, username, password):
         """Upon initialization, set the credentials. But don't attempt to sign-in until
@@ -57,6 +76,7 @@ class ElectricObject:
         self.username = username
         self.password = password
         self.signed_in_session = None
+        self.last_request_time = 0
 
     def signin(self):
         """ Sign in. If successful, set self.signed_in_session to the session for reuse in
@@ -69,9 +89,11 @@ class ElectricObject:
         self.signed_in_session = None
         try:
             session = requests.Session()
-            signin_response = session.get("https://www.electricobjects.com/sign_in")
+            self.check_request_rate()
+            signin_response = session.get(self.base_url + "sign_in")
             if signin_response.status_code != requests.codes.ok:
-                print "Error: unable to sign in. Status: ", signin_response.status_code, ", response: ", signin_response.text
+                log("Error: unable to sign in. Status: {0}, response: {1}".
+                    format(signin_response.status_code, signin_response.text))
                 return
             tree = html.fromstring(signin_response.content)
             authenticity_token = tree.xpath("string(//input[@name='authenticity_token']/@value)")
@@ -82,23 +104,38 @@ class ElectricObject:
                 "user[password]": self.password,
                 "authenticity_token": authenticity_token
             }
-            p = session.post("https://www.electricobjects.com/sign_in", data=payload)
+            self.check_request_rate()
+            p = session.post(self.base_url + "sign_in", data=payload)
             if p.status_code != requests.codes.ok:
-                print "Error: unable to sign in. Status: ", p.status_code, ", response: ", requests.text
+                log("Error: unable to sign in. Status: {0}, response: {1}".
+                    format(signin_response.status_code, signin_response.text))
                 return
             self.signed_in_session = session
         except Exception as e:
-            print e
+            log("Exception in signin: " + str(e))
 
     def signed_in(self):
         """ Return true if we have a valid signed-in session. """
         return self.signed_in_session is not None
 
+    def check_request_rate(self):
+        """ Are we making requests too fast? If so, pause.
+
+            Specifically, check the current time against the last request time. If
+            less than MIN_REQUEST_INTERVAL, sleep the remaining time.
+
+            TODO: This function pauses the whole program. Improvement: create a
+            request queue that handles request asynchronously.
+        """
+        interval = time.clock() - self.last_request_time
+        if interval < MIN_REQUEST_INTERVAL:
+            time.sleep(MIN_REQUEST_INTERVAL - interval)
+
     def make_request(self, path, params=None, method="GET"):
         """Create a request of the given type and make the request to the Electric Objects API.
 
         Args:
-            path: The request target path for the URL.
+            path: The request target API endpoint.
             params: The URL parameters.
             method: The HTTP request type {GET, POST, PUT, DELETE}.
 
@@ -110,7 +147,9 @@ class ElectricObject:
             if not self.signed_in():
                 return None
 
-        url = self.base_url + path
+        url = self.base_url + self.api_version_path + path
+
+        self.check_request_rate()
         # TODO(gary): These requests should retry in case the sign-in has expired.
         if method == "GET":
             return self.signed_in_session.get(url, params=params)
@@ -121,7 +160,7 @@ class ElectricObject:
         elif method == "DELETE":
             return self.signed_in_session.delete(url)
 
-        print "Error: Unknown request type in make_request"
+        log("Error: Unknown request type in make_request")
         return None
 
     def make_JSON_request(self, path, params=None, method="GET"):
@@ -130,48 +169,65 @@ class ElectricObject:
         if response is None:
             return []
         elif response.status_code != requests.codes.ok:
-            print "Error in make_JSON_request(): response", response.status_code, response.reason
+            log("Error in make_JSON_request(). Response: {0} {1}".
+                format(response.status_code, response.reason))
             return []
         try:
             return response.json()
         except:
-            print "Error in make_JSON_request(): unable to parse JSON"
+            log("Error in make_JSON_request(): unable to parse JSON")
         return []
 
     def user(self):
         """Obtain the user information."""
-        path = "/api/beta/user/"
+        path = self.endpoints["user"]
         return self.make_request(path, method="GET")
 
     def favorite(self, media_id):
         """Set a media as a favorite by id."""
-        path = "/api/beta/user/artworks/favorited/" + media_id
+        path = self.endpoints["favorited"] + media_id
         return self.make_request(path, method="PUT")
 
     def unfavorite(self, media_id):
         """Remove a media as a favorite by id."""
-        path = "/api/beta/user/artworks/favorited/" + media_id
+        path = self.endpoints["favorited"] + media_id
         return self.make_request(path, method="DELETE")
 
     def display(self, media_id):
         """Display media by id."""
-        path = "/api/beta/user/artworks/displayed/" + media_id
+        path = self.endpoints["displayed"] + media_id
         return self.make_request(path, method="PUT")
 
     def favorites(self):
         """Return the user's list of favorites in JSON else [].
 
-        Note: At present, the API only returns the first 20 favorites.
-
         Returns:
-            The array of favorites in JSON format or else an empty list.
+            An array of up to NUM_FAVORITES_PER_REQUEST favorites in JSON format
+            or else an empty list.
         """
-        path = "/api/beta/user/artworks/favorited"
-        return self.make_JSON_request(path, method="GET")
+        offset = 0
+        favorites = []
+        while True:
+            params = {
+              "limit": NUM_FAVORITES_PER_REQUEST,
+              "offset": offset
+            }
+            path = self.endpoints["favorited"]
+            result_JSON = self.make_JSON_request(path, method="GET", params=params)
+            if not result_JSON:
+                break
+            favorites.extend(result_JSON)
+            if len(result_JSON) < NUM_FAVORITES_PER_REQUEST:  # last page
+                break
+            if len(favorites) > MAX_FAVORITES_FOR_DISPLAY:  # too many
+                favorites = favorites[:MAX_FAVORITES_FOR_DISPLAY]
+                break
+            offset += NUM_FAVORITES_PER_REQUEST
+        return favorites
 
     def devices(self):
         """Return a list of devices in JSON format, else []."""
-        path = "/api/beta/user/devices"
+        path = self.endpoints["devices"]
         return self.make_JSON_request(path, method="GET")
 
     def choose_random_item(self, items, excluded_id=None):
@@ -208,7 +264,7 @@ class ElectricObject:
         """
         devs = self.devices()
         if not devs:
-            print "Error in display_random_favorite: no devices returned."
+            log("Error in display_random_favorite: no devices returned.")
             return 0
         device_index = 0
         current_image_id = devs[device_index]["reproduction"]["artwork"]["id"]
@@ -229,7 +285,7 @@ class ElectricObject:
         """
         url = "set_url"
         with requests.Session() as s:
-            eo_sign = s.get("https://www.electricobjects.com/sign_in")
+            eo_sign = s.get(self.base_url + "sign_in")
             tree = html.fromstring(eo_sign.content)
             authenticity_token = tree.xpath("string(//input[@name='authenticity_token']/@value)")
             payload = {
@@ -237,9 +293,9 @@ class ElectricObject:
                 "user[password]": self.password,
                 "authenticity_token": authenticity_token
             }
-            p = s.post("https://www.electricobjects.com/sign_in", data=payload)
+            p = s.post(self.base_url + "sign_in", data=payload)
             if p.status_code == requests.codes.ok:
-                eo_sign = s.get("https://www.electricobjects.com/set_url")
+                eo_sign = s.get(self.base_url + "set_url")
                 tree = html.fromstring(eo_sign.content)
                 authenticity_token = tree.xpath("string(//input[@name='authenticity_token']/@value)")
                 params = {
