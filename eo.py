@@ -368,6 +368,24 @@ class ElectricObject:
             items = [item for item in items if item["artwork"]["id"] != excluded_id]
         return random.choice(items)
 
+    def current_artwork_id(self, device_json):
+        """Return the id of the artwork currently displayed on the given device.
+
+        Args:
+            device_json: The JSON describing the state of a device.
+
+        Returns:
+            An artwork id or 0 if the id isn't present in the device_json.
+        """
+        if not device_json:
+            return 0
+        id = 0
+        try:
+            id = device_json["reproduction"]["artwork"]["id"]
+        except KeyError as e:
+            log("Error parsing device JSON. Missing key: {0}".format(e))
+        return id
+
     def display_random_favorite(self):
         """Retrieve the user's favorites and displays one of them randomly.
 
@@ -388,7 +406,7 @@ class ElectricObject:
             log("Error in display_random_favorite: no devices returned.")
             return 0
         device_index = 0
-        current_image_id = devs[device_index]["reproduction"]["artwork"]["id"]
+        current_image_id = self.current_artwork_id(devs[device_index])
 
         favs = self.favorites()
         if favs == []:
