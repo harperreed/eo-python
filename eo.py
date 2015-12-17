@@ -58,7 +58,16 @@ class ElectricObject:
     Usage: instantiate the object with credentials, then make one or more API calls
     with the object.
     """
+
+    # Class variables
     base_url = "https://www.electricobjects.com/"
+    api_version_path = "api/beta/"
+    endpoints = {
+        "user": "user/",
+        "devices": "user/devices/",
+        "displayed": "user/artworks/displayed/",
+        "favorited": "user/artworks/favorited/"
+        }
 
     def __init__(self, username, password):
         """Upon initialization, set the credentials. But don't attempt to sign-in until
@@ -81,7 +90,7 @@ class ElectricObject:
         try:
             session = requests.Session()
             self.check_request_rate()
-            signin_response = session.get("https://www.electricobjects.com/sign_in")
+            signin_response = session.get(self.base_url + "sign_in")
             if signin_response.status_code != requests.codes.ok:
                 log("Error: unable to sign in. Status: {0}, response: {1}".
                     format(signin_response.status_code, signin_response.text))
@@ -96,7 +105,7 @@ class ElectricObject:
                 "authenticity_token": authenticity_token
             }
             self.check_request_rate()
-            p = session.post("https://www.electricobjects.com/sign_in", data=payload)
+            p = session.post(self.base_url + "sign_in", data=payload)
             if p.status_code != requests.codes.ok:
                 log("Error: unable to sign in. Status: {0}, response: {1}".
                     format(signin_response.status_code, signin_response.text))
@@ -126,7 +135,7 @@ class ElectricObject:
         """Create a request of the given type and make the request to the Electric Objects API.
 
         Args:
-            path: The request target path for the URL.
+            path: The request target API endpoint.
             params: The URL parameters.
             method: The HTTP request type {GET, POST, PUT, DELETE}.
 
@@ -138,7 +147,8 @@ class ElectricObject:
             if not self.signed_in():
                 return None
 
-        url = self.base_url + path
+        url = self.base_url + self.api_version_path + path
+
         self.check_request_rate()
         # TODO(gary): These requests should retry in case the sign-in has expired.
         if method == "GET":
@@ -170,22 +180,22 @@ class ElectricObject:
 
     def user(self):
         """Obtain the user information."""
-        path = "/api/beta/user/"
+        path = self.endpoints["user"]
         return self.make_request(path, method="GET")
 
     def favorite(self, media_id):
         """Set a media as a favorite by id."""
-        path = "/api/beta/user/artworks/favorited/" + media_id
+        path = self.endpoints["favorited"] + media_id
         return self.make_request(path, method="PUT")
 
     def unfavorite(self, media_id):
         """Remove a media as a favorite by id."""
-        path = "/api/beta/user/artworks/favorited/" + media_id
+        path = self.endpoints["favorited"] + media_id
         return self.make_request(path, method="DELETE")
 
     def display(self, media_id):
         """Display media by id."""
-        path = "/api/beta/user/artworks/displayed/" + media_id
+        path = self.endpoints["displayed"] + media_id
         return self.make_request(path, method="PUT")
 
     def favorites(self):
@@ -195,8 +205,6 @@ class ElectricObject:
             An array of up to NUM_FAVORITES_PER_REQUEST favorites in JSON format
             or else an empty list.
         """
-        path = "/api/beta/user/artworks/favorited"
-
         offset = 0
         favorites = []
         while True:
@@ -204,6 +212,7 @@ class ElectricObject:
               "limit": NUM_FAVORITES_PER_REQUEST,
               "offset": offset
             }
+            path = self.endpoints["favorited"]
             result_JSON = self.make_JSON_request(path, method="GET", params=params)
             if not result_JSON:
                 break
@@ -218,7 +227,7 @@ class ElectricObject:
 
     def devices(self):
         """Return a list of devices in JSON format, else []."""
-        path = "/api/beta/user/devices"
+        path = self.endpoints["devices"]
         return self.make_JSON_request(path, method="GET")
 
     def choose_random_item(self, items, excluded_id=None):
@@ -276,7 +285,7 @@ class ElectricObject:
         """
         url = "set_url"
         with requests.Session() as s:
-            eo_sign = s.get("https://www.electricobjects.com/sign_in")
+            eo_sign = s.get(self.base_url + "sign_in")
             tree = html.fromstring(eo_sign.content)
             authenticity_token = tree.xpath("string(//input[@name='authenticity_token']/@value)")
             payload = {
@@ -284,9 +293,9 @@ class ElectricObject:
                 "user[password]": self.password,
                 "authenticity_token": authenticity_token
             }
-            p = s.post("https://www.electricobjects.com/sign_in", data=payload)
+            p = s.post(self.base_url + "sign_in", data=payload)
             if p.status_code == requests.codes.ok:
-                eo_sign = s.get("https://www.electricobjects.com/set_url")
+                eo_sign = s.get(self.base_url + "set_url")
                 tree = html.fromstring(eo_sign.content)
                 authenticity_token = tree.xpath("string(//input[@name='authenticity_token']/@value)")
                 params = {
