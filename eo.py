@@ -131,11 +131,11 @@ class ElectricObject:
         if interval < MIN_REQUEST_INTERVAL:
             time.sleep(MIN_REQUEST_INTERVAL - interval)
 
-    def make_request(self, path, params=None, method="GET"):
+    def make_request(self, endpoint, params=None, method="GET", path_append=None):
         """Create a request of the given type and make the request to the Electric Objects API.
 
         Args:
-            path: The request target API endpoint.
+            endpoint: The id of the request target API endpoint in self.endpoints.
             params: The URL parameters.
             method: The HTTP request type {GET, POST, PUT, DELETE}.
 
@@ -147,7 +147,9 @@ class ElectricObject:
             if not self.signed_in():
                 return None
 
-        url = self.base_url + self.api_version_path + path
+        url = self.base_url + self.api_version_path + self.endpoints[endpoint]
+        if path_append:
+            url += path_append
 
         self.check_request_rate()
         # TODO(gary): These requests should retry in case the sign-in has expired.
@@ -163,9 +165,9 @@ class ElectricObject:
         log("Error: Unknown request type in make_request")
         return None
 
-    def make_JSON_request(self, path, params=None, method="GET"):
+    def make_JSON_request(self, endpoint, params=None, method="GET", path_append=None):
         """Create and make the given request, returning the result as JSON, else []."""
-        response = self.make_request(path, params=params, method=method)
+        response = self.make_request(endpoint, params=params, method=method, path_append=path_append)
         if response is None:
             return []
         elif response.status_code != requests.codes.ok:
@@ -180,23 +182,19 @@ class ElectricObject:
 
     def user(self):
         """Obtain the user information."""
-        path = self.endpoints["user"]
-        return self.make_request(path, method="GET")
+        return self.make_request("user", method="GET")
 
     def favorite(self, media_id):
         """Set a media as a favorite by id."""
-        path = self.endpoints["favorited"] + media_id
-        return self.make_request(path, method="PUT")
+        return self.make_request("favorited", method="PUT", path_append=media_id)
 
     def unfavorite(self, media_id):
         """Remove a media as a favorite by id."""
-        path = self.endpoints["favorited"] + media_id
-        return self.make_request(path, method="DELETE")
+        return self.make_request("favorited", method="DELETE", path_append=media_id)
 
     def display(self, media_id):
         """Display media by id."""
-        path = self.endpoints["displayed"] + media_id
-        return self.make_request(path, method="PUT")
+        return self.make_request("displayed", method="PUT", path_append=media_id)
 
     def favorites(self):
         """Return the user's list of favorites in JSON else [].
@@ -212,8 +210,7 @@ class ElectricObject:
               "limit": NUM_FAVORITES_PER_REQUEST,
               "offset": offset
             }
-            path = self.endpoints["favorited"]
-            result_JSON = self.make_JSON_request(path, method="GET", params=params)
+            result_JSON = self.make_JSON_request("favorited", method="GET", params=params)
             if not result_JSON:
                 break
             favorites.extend(result_JSON)
@@ -227,8 +224,7 @@ class ElectricObject:
 
     def devices(self):
         """Return a list of devices in JSON format, else []."""
-        path = self.endpoints["devices"]
-        return self.make_JSON_request(path, method="GET")
+        return self.make_JSON_request("devices", method="GET")
 
     def choose_random_item(self, items, excluded_id=None):
         """Return a random item, avoiding the one with the excluded_id, if given.
