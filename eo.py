@@ -61,7 +61,7 @@ class ElectricObject:
 
     # Class variables
     base_url = "https://www.electricobjects.com/"
-    api_version_path = "api/beta/"
+    api_version_path = "api/v2/"
     endpoints = {
         "user": "user/",
         "devices": "user/devices/",
