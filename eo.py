@@ -101,7 +101,10 @@ class ElectricObject:
         self.check_request_rate()
         url = self.base_url + path
         response = self.request_with_retries(url)
-        if not response or response.status_code != requests.codes.ok:
+        if not response:
+            log("Error: unable to read {0}.".format(url))
+            return ""
+        elif response.status_code != requests.codes.ok:
             log("Error: unable to read: {0}. Status: {1}, response: {2}".
                 format(url, response.status_code, response.text))
             return ""
@@ -255,8 +258,9 @@ class ElectricObject:
                 break
 
             # retries + 1: Use natural numbers for readability.
+            jittered_delay = jitter(delay, 0.20)
             log("Error: Failed request {0} of {1}. Retrying in {2} seconds.".
-                format(retries + 1, NUM_RETRIES + 1, delay))
+                format(retries + 1, NUM_RETRIES + 1, jittered_delay))
 
             # Exponential backoff: Double the delay between each retry, or equivilently,
             #     delay = INITIAL_RETRY_DELAY * 2 ** retries
@@ -265,7 +269,7 @@ class ElectricObject:
             # to disperse.
             delay *= 2
             retries += 1
-            time.sleep(delay)
+            time.sleep(jittered_delay)
 
         log("Error: Maximum HTTP request attempts ({0}) exceeded.".format(NUM_RETRIES + 1))
         return None
@@ -445,6 +449,21 @@ class ElectricObject:
         return r.status_code == requests.codes.ok
 
 
+def jitter(interval, factor):
+    """Return the interval +/- a randomized amount of the interval.
+
+    Example:
+        To jitter t by 20%: t = jitter(t, 0.20)
+        Ie, if t = 10.0, the resulting t will be in {8.0, 12.0}
+
+    Args:
+        interval: a time period to be jittered.
+        factor: the portion of interval to include in the randomization, expressed as a float
+                between 0.0 and 1.0.
+    """
+    return interval + interval * factor * (2.0 * random.random() - 1.0)
+
+
 def get_credentials():
     """Obtains the electricobjects.com username and password. They can be set here in the code,
     in environment variables, or in a file named by CREDENTIALS_FILE.
@@ -486,7 +505,25 @@ def main():
     credentials = get_credentials()
     eo = ElectricObject(username=credentials["username"], password=credentials["password"])
     displayed = eo.display_random_favorite()
-    log("Displayed artwork id " + str(displayed))
+    if displayed:
+        log("Displayed artwork id " + str(displayed))
+
+    time.sleep(10)
+
+    # Let's set a URL.
+    # Hmmm. This one didn't work: http://www.ustream.tv/channel/live-iss-stream/pop-out
+    # The EO1 display reads: 'Missing Flash plugin'
+    #
+    # This one works, creating an autoplaying slideshow:
+    # url = "http://theslideshow.net/#advanced/search-advanced-query=architectural+study" + \
+    #       "&imageSize=Extra_Large"
+    #
+    # A single image, 1080x1920:
+    url = "http://hd.highresolution-wallpapers.net/wallpapers/" + \
+          "board_circuit_silicon_chip_technology_high_resolution_wallpapers-1080x1920.jpg"
+    displayed = eo.set_url(url)
+    if displayed:
+        log("Displayed URL " + url)
 
     # Mark a media item as a favorite.
     # print eo.favorite("5626")
@@ -495,9 +532,6 @@ def main():
 
     # Display a media item by id.
     # print eo.display("1136")
-
-    # Let's set a URL.
-    # print eo.set_url("http://www.harperreed.com/")
 
 if __name__ == "__main__":
     main()
