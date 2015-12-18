@@ -93,54 +93,56 @@ class ElectricObject:
         self.last_request_time = 0
         self.last_signin_time = 0
 
-    def get_authorization_token(self):
-        """Request, parse, and return the authorization token else a blank string."""
+    def request_authenticity_token(self, path):
+        """Request, parse, and return the authenticity token needed to post to the given path."""
         authenticity_token = ""
 
         # Request the page with the token.
         self.check_request_rate()
-        url = self.base_url + "sign_in"
-        signin_response = self.request_with_retries(url)
-        if not signin_response or signin_response.status_code != requests.codes.ok:
-            log("Error: unable to sign in. Status: {0}, response: {1}".
-                format(signin_response.status_code, signin_response.text))
+        url = self.base_url + path
+        response = self.request_with_retries(url)
+        if not response or response.status_code != requests.codes.ok:
+            log("Error: unable to read: {0}. Status: {1}, response: {2}".
+                format(url, response.status_code, response.text))
             return ""
 
         # Parse out the token.
         try:
-            tree = html.fromstring(signin_response.content)
+            tree = html.fromstring(response.content)
             authenticity_token = tree.xpath("string(//input[@name='authenticity_token']/@value)")
         except Exception as e:
-            log("Error: problem parsing authorization token: " + str(e))
+            log("Error: problem parsing authenticity token: " + str(e))
         return authenticity_token
 
-    def request_signin(self, authenticity_token):
-        """ Use the given authenticity_token to request a sign-in from the EO web server.
-        Return True on succcess.
+    def post_payload(self, path, payload, authenticity_token):
+        """Post the given payload to the endpoint given by path.
+
+        Args:
+            path: the path from the base_url.
+            payload: the key/values to post.
+            authenticity_token: the required auth token.
+
+        Returns:
+            The response, else None.
         """
         if not authenticity_token:
-            return False
+            return None
 
-        url = self.base_url + "sign_in"
-        payload = {
-            "user[email]": self.username,
-            "user[password]": self.password,
-            "authenticity_token": authenticity_token
-        }
+        url = self.base_url + path
         self.check_request_rate()
-        response = self.request_with_retries(url, method="POST", data=payload)
+        response = self.request_with_retries(url, method="POST", params=payload)
         if response and response.status_code == requests.codes.ok:
-            return True
+            return response
 
         if not response:
-            log("Error: unable to sign in.")
+            log("Error: unable to post to {0}.".format(url))
         else:
-            log("Error: unable to sign in. Status: {0}, response: {1}".
-                format(response.status_code, response.text))
-        return False
+            log("Error: unable to post to {0}. Status: {1}, response: {2}".
+                format(url, response.status_code, response.text))
+        return None
 
     def signin(self):
-        """ Sign in. If successful, set self.signed_in_session to the session for reuse in
+        """Sign in. If successful, set self.signed_in_session to the session for reuse in
         subsequent requests. If not, set self.signed_in_session to None.
 
         Note that while the session in self.signed_in_session can be reused for subsequent
@@ -148,15 +150,20 @@ class ElectricObject:
         try signing in again.
         """
         self.signed_in_session = requests.Session()
-        authenticity_token = self.get_authorization_token()
-        success = self.request_signin(authenticity_token)
+        authenticity_token = self.request_authenticity_token("sign_in")
+        payload = {
+            "user[email]": self.username,
+            "user[password]": self.password,
+            "authenticity_token": authenticity_token
+        }
+        success = self.post_payload("sign_in", payload, authenticity_token)
         if not success:
             self.signed_in_session = None
             return
         self.last_signin_time = time.clock()
 
     def signed_in(self):
-        """ Return true if we have a valid signed-in session. """
+        """Return true if we have a valid signed-in session. """
         return self.signed_in_session is not None
 
     def check_signin_status(self):
@@ -171,7 +178,7 @@ class ElectricObject:
         return True
 
     def check_request_rate(self):
-        """ Are we making requests too fast? If so, pause.
+        """Are we making requests too fast? If so, pause.
 
         Specifically, check the current time against the last request time. If
         less than MIN_REQUEST_INTERVAL, sleep the remaining time.
@@ -183,14 +190,13 @@ class ElectricObject:
         if interval < MIN_REQUEST_INTERVAL:
             time.sleep(MIN_REQUEST_INTERVAL - interval)
 
-    def execute_request(self, url, params=None, method="GET", data=None):
-        """ Request the given URL with the given method and parameters.
+    def execute_request(self, url, params=None, method="GET"):
+        """Request the given URL with the given method and parameters.
 
         Args:
             url: The URL to call.
             params: The optional parameters.
             method: The HTTP request type {GET, POST, PUT, DELETE}.
-            data: The data to send for POST requests.
 
         Returns:
             The server response or None.
@@ -200,7 +206,7 @@ class ElectricObject:
             if method == "GET":
                 return self.signed_in_session.get(url, params=params)
             elif method == "POST":
-                return self.signed_in_session.post(url, params=params, data=data)
+                return self.signed_in_session.post(url, params=params)
             elif method == "PUT":
                 return self.signed_in_session.put(url)
             elif method == "DELETE":
@@ -211,8 +217,8 @@ class ElectricObject:
             log("Error in making HTTP request: {0}".format(e))
         return None
 
-    def request_with_retries(self, url, params=None, method="GET", data=None):
-        """ Call the given request, returning the response or None if error.
+    def request_with_retries(self, url, params=None, method="GET"):
+        """Call the given request, returning the response or None if error.
 
         Retry the request up to NUM_RETRIES times if:
 
@@ -228,7 +234,6 @@ class ElectricObject:
             url: The URL to call.
             params: The optional parameters.
             method: The HTTP request type {GET, POST, PUT, DELETE}.
-            data: The data to send for POST requests.
 
         Returns:
             The server response or None.
@@ -237,7 +242,7 @@ class ElectricObject:
         delay = INITIAL_RETRY_DELAY
         while True:
             pass
-            response = self.execute_request(url, params=params, method=method, data=data)
+            response = self.execute_request(url, params=params, method=method)
 
             if response:
                 if response.status_code < 500:
@@ -387,7 +392,8 @@ class ElectricObject:
         return id
 
     def display_random_favorite(self):
-        """Retrieve the user's favorites and displays one of them randomly.
+        """Retrieve the user's favorites and display one of them randomly on the first device
+        associated with the signed-in user.
 
         Note that at present, only the first 20 favorites are returned by the API.
 
@@ -405,7 +411,7 @@ class ElectricObject:
         if not devs:
             log("Error in display_random_favorite: no devices returned.")
             return 0
-        device_index = 0
+        device_index = 0  # First device of user.
         current_image_id = self.current_artwork_id(devs[device_index])
 
         favs = self.favorites()
@@ -419,30 +425,24 @@ class ElectricObject:
         return fav_id
 
     def set_url(self, url):
-        """Set a URL to be on the display.
-        Note: IN PROGRESS. This function does not successfully display a URL on the EO1 currently.
+        """Display the given URL on the first device associated with the signed-in user.
+        Return True on success.
         """
-        url = "set_url"
-        with requests.Session() as s:
-            eo_sign = s.get(self.base_url + "sign_in")
-            tree = html.fromstring(eo_sign.content)
-            authenticity_token = tree.xpath("string(//input[@name='authenticity_token']/@value)")
-            payload = {
-                "user[email]": self.username,
-                "user[password]": self.password,
-                "authenticity_token": authenticity_token
-            }
-            p = s.post(self.base_url + "sign_in", data=payload)
-            if p.status_code == requests.codes.ok:
-                eo_sign = s.get(self.base_url + "set_url")
-                tree = html.fromstring(eo_sign.content)
-                authenticity_token = tree.xpath("string(//input[@name='authenticity_token']/@value)")
-                params = {
-                  "custom_url": url,
-                  "authenticity_token": authenticity_token
-                }
-                r = s.post(self.base_url + url, params=params)
-                return r.status_code == requests.codes.ok
+        devs = self.devices()
+        if not devs:
+            log("Error in set_url: no devices returned.")
+            return 0
+        device_index = 0  # First device of user.
+        device_id = devs[device_index]["id"]
+
+        authenticity_token = self.request_authenticity_token("set_url")
+        params = {
+          "device_id": device_id,
+          "custom_url": url,
+          "authenticity_token": authenticity_token
+        }
+        r = self.post_payload("set_url", params, authenticity_token)
+        return r.status_code == requests.codes.ok
 
 
 def get_credentials():
@@ -498,7 +498,6 @@ def main():
 
     # Let's set a URL.
     # print eo.set_url("http://www.harperreed.com/")
-
 
 if __name__ == "__main__":
     main()
