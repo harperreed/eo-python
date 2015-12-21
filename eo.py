@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
     Here is a wrapper for the *unreleased* electric objects API.
