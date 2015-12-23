@@ -35,7 +35,7 @@ CREDENTIALS_FILE = ".credentials"
 USER_ENV_VAR = "EO_USER"
 PASSWORD_ENV_VAR = "EO_PASS"
 LOG_FILENAME = 'eo-python.log'
-LOG_SIZE = 1000  # bytes
+LOG_SIZE = 1000000  # bytes
 LOG_NUM = 5  # number of rotating logs to keep
 
 # The maximum number of favorites to consider for randomly displaying one.
