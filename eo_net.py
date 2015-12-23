@@ -1,5 +1,5 @@
 from lxml import html
-from log import log
+import logging
 import random
 import requests
 import time
@@ -34,7 +34,8 @@ class EO_Net(object):
     Calls are rate limited and include retries with jitter, limits, and exponential backoff.
     """
 
-    def __init__(self, username, password, signin_url):
+    def __init__(self):
+        self.logger = logging.getLogger('.'.join([__name__, self.__class__.__name__]))
         self.session = None
         self.last_request_time = 0
 
@@ -52,11 +53,11 @@ class EO_Net(object):
         self.check_request_rate()
         response = self.request_with_retries(url)
         if not response:
-            log("Error: unable to read {0}.".format(url))
+            self.logger.error("unable to read {0}.".format(url))
             return ""
         elif response.status_code != requests.codes.ok:
-            log("Error: unable to read: {0}. Status: {1}, response: {2}".
-                format(url, response.status_code, response.text))
+            self.logger.error("unable to read: {0}. Status: {1}, response: {2}".
+                              format(url, response.status_code, response.text))
             return ""
 
         # Parse out the token.
@@ -64,7 +65,7 @@ class EO_Net(object):
             tree = html.fromstring(response.content)
             authenticity_token = tree.xpath("string(//input[@name='authenticity_token']/@value)")
         except Exception as e:
-            log("Error: problem parsing authenticity token: " + str(e))
+            self.logger.error("problem parsing authenticity token: " + str(e))
         return authenticity_token
 
     def post_with_authenticity(self, url, payload):
@@ -95,10 +96,10 @@ class EO_Net(object):
             return response
 
         if not response:
-            log("Error: unable to post to {0}.".format(url))
+            self.logger.error("unable to post to {0}.".format(url))
         else:
-            log("Error: unable to post to {0}. Status: {1}, response: {2}".
-                format(url, response.status_code, response.text))
+            self.logger.error("unable to post to {0}. Status: {1}, response: {2}".
+                              format(url, response.status_code, response.text))
         return None
 
     def check_request_rate(self):
@@ -136,9 +137,9 @@ class EO_Net(object):
             elif method == "DELETE":
                 return self.session.delete(url)
             else:
-                log("Unknown request type: {0}".format(method))
+                self.logger.error("unknown request type: {0}".format(method))
         except Exception as e:
-            log("Error in making HTTP request: {0}".format(e))
+            self.logger.error("problem making HTTP request: {0}".format(e))
         return None
 
     def request_with_retries(self, url, params=None, method="GET"):
@@ -172,8 +173,8 @@ class EO_Net(object):
                 if response.status_code < 500:
                     return response
                 else:
-                    log("Error from API server. Response: {0} {1}.".
-                        format(response.status_code, response.reason))
+                    self.logger.error("from API server. Response: {0} {1}.".
+                                      format(response.status_code, response.reason))
 
             if retries == NUM_RETRIES:
                 break
@@ -183,8 +184,8 @@ class EO_Net(object):
             jittered_delay = self.jitter(delay, JITTER_FACTOR)
 
             # retries + 1: Use natural numbers for readability.
-            log("Error: Failed request {0} of {1}. Retrying in {2:.1f} seconds.".
-                format(retries + 1, NUM_RETRIES + 1, jittered_delay))
+            self.logger.error("failed request {0} of {1}. Retrying in {2:.1f} seconds.".
+                              format(retries + 1, NUM_RETRIES + 1, jittered_delay))
 
             # Exponential backoff: Double the delay between each retry, or equivilently,
             #     delay = INITIAL_RETRY_DELAY * 2 ** retries
@@ -195,7 +196,7 @@ class EO_Net(object):
             retries += 1
             time.sleep(jittered_delay)
 
-        log("Error: Maximum HTTP request attempts ({0}) exceeded.".format(NUM_RETRIES + 1))
+        self.logger.error("maximum HTTP request attempts ({0}) exceeded.".format(NUM_RETRIES + 1))
         return None
 
     def make_request(self, url, params=None, method="GET", parse_json=False):
@@ -205,8 +206,8 @@ class EO_Net(object):
         if response is None:
             return None
         elif response.status_code < 200 or response.status_code >= 300:
-            log("Error in make_request(): sent {0} to url {1} with parameters {2}. Response: {3} {4}".
-                format(method, url, params, response.status_code, response.reason))
+            self.logger.error("sent {0} to url {1} with parameters {2}. Response: {3} {4}".
+                              format(method, url, params, response.status_code, response.reason))
             return None
 
         if not parse_json:
@@ -215,7 +216,7 @@ class EO_Net(object):
         try:
             return response.json()
         except:
-            log("Error in make_request(): unable to parse JSON")
+            self.logger.error("unable to parse JSON")
         return None
 
     def jitter(self, interval, factor):
