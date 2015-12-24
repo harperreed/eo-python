@@ -50,7 +50,7 @@ class ElectricObject(object):
 
     def __init__(self, username, password):
         self.api = eo_api.EO_API(username, password)
-        self.logger = logging.getLogger('.'.join([__name__, self.__class__.__name__]))
+        self.logger = logging.getLogger(".".join(["eo", self.__class__.__name__]))
 
     def user(self):
         """Obtain the user information."""
@@ -225,7 +225,7 @@ def get_credentials():
 def setup_logging():
     """Set up logging to log to rotating files and also console output."""
     formatter = logging.Formatter('%(asctime)-15s %(name)-5s %(levelname)-8s %(message)s')
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger("eo")
     logger.setLevel(logging.INFO)
 
     # rotating file handler

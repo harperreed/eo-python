@@ -25,6 +25,10 @@ NUM_RETRIES = 4
 # The amount of variation as a float. 0.20 == +/- 20%
 JITTER_FACTOR = 0.20
 
+# Note if a logger is not configured when this class is instantiated, an error will issue like:
+#       No handlers could be found for logger "eo.EO_Net"
+# To fix, initialize a logger in your main. This class writes error messages to the logging system.
+
 
 class EO_Net(object):
     """The EO_Net class provides network functions for the API.
@@ -35,7 +39,7 @@ class EO_Net(object):
     """
 
     def __init__(self):
-        self.logger = logging.getLogger('.'.join([__name__, self.__class__.__name__]))
+        self.logger = logging.getLogger(".".join(["eo", self.__class__.__name__]))
         self.session = None
         self.last_request_time = 0
 
