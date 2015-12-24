@@ -26,10 +26,11 @@
 
 import eo_api
 import logging
+import logging.handlers
 import os
 import random
 import requests
-import logging.handlers
+from scheduler import Scheduler
 
 CREDENTIALS_FILE = ".credentials"
 USER_ENV_VAR = "EO_USER"
@@ -37,6 +38,10 @@ PASSWORD_ENV_VAR = "EO_PASS"
 LOG_FILENAME = 'eo-python.log'
 LOG_SIZE = 1000000  # bytes
 LOG_NUM = 5  # number of rotating logs to keep
+
+# 24-hour time
+SCHEDULE = ["6:00", "12:00", "17:00", "22:00"]
+SCHEDULE_JITTER = 10  # in minutes
 
 # The maximum number of favorites to consider for randomly displaying one.
 MAX_FAVORITES_FOR_DISPLAY = 200
@@ -241,12 +246,21 @@ def setup_logging():
     return logger
 
 
-def main():
-    """An example main that displays a random favorite."""
-    logger = setup_logging()
+def scheduled_fn(eo):
+    """
 
-    credentials = get_credentials()
-    eo = ElectricObject(username=credentials["username"], password=credentials["password"])
+    """
+    logger = logging.getLogger(__name__)
+    logger.info('updating favorite')
+    displayed = eo.display_random_favorite()
+    if displayed:
+        logger.info("Displayed artwork id " + str(displayed))
+
+
+def demo(eo):
+    """An example that displays a random favorite."""
+    logger = logging.getLogger(__name__)
+
     displayed = eo.display_random_favorite()
     if displayed:
         logger.info("Displayed artwork id " + str(displayed))
@@ -273,6 +287,19 @@ def main():
 
     # Display a media item by id.
     # print eo.display("1136")
+
+
+def main():
+    setup_logging()
+
+    credentials = get_credentials()
+    eo = ElectricObject(username=credentials["username"], password=credentials["password"])
+
+    # demo(eo)
+
+    scheduler = Scheduler(SCHEDULE, lambda: scheduled_fn(eo), SCHEDULE_JITTER)
+    scheduler.run()
+
 
 if __name__ == "__main__":
     main()
