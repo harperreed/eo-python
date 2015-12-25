@@ -30,7 +30,7 @@ class EO_API(object):
         }
 
     def __init__(self, username, password):
-        self.logger = logging.getLogger('.'.join([__name__, self.__class__.__name__]))
+        self.logger = logging.getLogger(".".join(["eo", self.__class__.__name__]))
         signin_url = self.base_url + "sign_in"
         self.username = username
         self.password = password
