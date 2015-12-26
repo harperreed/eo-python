@@ -39,8 +39,8 @@ LOG_FILENAME = 'eo-python.log'
 LOG_SIZE = 1000000  # bytes
 LOG_NUM = 5  # number of rotating logs to keep
 
-# 24-hour time
-SCHEDULE = ["6:00", "12:00", "17:00", "22:00"]
+
+SCHEDULE = ["7:02", "12:02", "17:02", "22:02"]  # 24-hour time format
 SCHEDULE_JITTER = 10  # in minutes
 
 # The maximum number of favorites to consider for randomly displaying one.
@@ -246,12 +246,10 @@ def setup_logging():
     return logger
 
 
-def scheduled_fn(eo):
-    """
-
-    """
-    logger = logging.getLogger(__name__)
-    logger.info('updating favorite')
+def new_favorite(eo):
+    """Update the EO1 with a new, randomly selected favorite."""
+    logger = logging.getLogger("eo")
+    logger.info('Updating favorite')
     displayed = eo.display_random_favorite()
     if displayed:
         logger.info("Displayed artwork id " + str(displayed))
@@ -259,7 +257,7 @@ def scheduled_fn(eo):
 
 def demo(eo):
     """An example that displays a random favorite."""
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger("eo")
 
     displayed = eo.display_random_favorite()
     if displayed:
@@ -297,7 +295,7 @@ def main():
 
     # demo(eo)
 
-    scheduler = Scheduler(SCHEDULE, lambda: scheduled_fn(eo), SCHEDULE_JITTER)
+    scheduler = Scheduler(SCHEDULE, lambda: new_favorite(eo), schedule_jitter=SCHEDULE_JITTER)
     scheduler.run()
 
 
