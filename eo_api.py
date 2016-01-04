@@ -7,6 +7,8 @@ import time
 # How often should we sign-in?
 SIGNIN_INTERVAL_IN_HOURS = 4  # hours
 
+USER_AGENT = "eo-python-client"
+
 
 class EO_API(object):
     """The API class provides functions for the Electric Objects API calls.
@@ -46,7 +48,9 @@ class EO_API(object):
         requests, the sign-in may expire after some time. So requests that fail should
         try signing in again.
         """
-        self.net.set_session(requests.Session())
+        new_session = requests.Session()
+        new_session.headers["User-Agent"] = USER_AGENT
+        self.net.set_session(new_session)
         payload = {
             "user[email]": self.username,
             "user[password]": self.password
