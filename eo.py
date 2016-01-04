@@ -34,6 +34,7 @@ import time
 CREDENTIALS_FILE = ".credentials"
 USER_ENV_VAR = "EO_USER"
 PASSWORD_ENV_VAR = "EO_PASS"
+USER_AGENT = "eo-python-client"
 
 # The maximum number of favorites to consider for randomly displaying one.
 MAX_FAVORITES_FOR_DISPLAY = 200
@@ -153,6 +154,7 @@ class ElectricObject:
         try signing in again.
         """
         self.signed_in_session = requests.Session()
+        self.signed_in_session.headers["User-Agent"] = USER_AGENT
         authenticity_token = self.request_authenticity_token("sign_in")
         payload = {
             "user[email]": self.username,
@@ -519,11 +521,11 @@ def main():
     #       "&imageSize=Extra_Large"
     #
     # A single image, 1080x1920:
-    url = "http://hd.highresolution-wallpapers.net/wallpapers/" + \
-          "board_circuit_silicon_chip_technology_high_resolution_wallpapers-1080x1920.jpg"
-    displayed = eo.set_url(url)
-    if displayed:
-        log("Displayed URL " + url)
+    # url = "http://hd.highresolution-wallpapers.net/wallpapers/" + \
+    #       "board_circuit_silicon_chip_technology_high_resolution_wallpapers-1080x1920.jpg"
+    # displayed = eo.set_url(url)
+    # if displayed:
+    #     log("Displayed URL " + url)
 
     # Mark a media item as a favorite.
     # print eo.favorite("5626")
