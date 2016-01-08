@@ -235,11 +235,11 @@ def main():
     #       "&imageSize=Extra_Large"
     #
     # A single image, 1080x1920:
-    url = "http://hd.highresolution-wallpapers.net/wallpapers/" + \
-          "board_circuit_silicon_chip_technology_high_resolution_wallpapers-1080x1920.jpg"
-    displayed = eo.set_url(url)
-    if displayed:
-        log("Displayed URL " + url)
+    # url = "http://hd.highresolution-wallpapers.net/wallpapers/" + \
+    #       "board_circuit_silicon_chip_technology_high_resolution_wallpapers-1080x1920.jpg"
+    # displayed = eo.set_url(url)
+    # if displayed:
+    #     log("Displayed URL " + url)
 
     # Mark a media item as a favorite.
     # print eo.favorite("5626")
