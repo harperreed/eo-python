@@ -25,14 +25,18 @@
 """
 
 import eo_api
-from log import log
+import logging
 import os
 import random
 import requests
+import logging.handlers
 
 CREDENTIALS_FILE = ".credentials"
 USER_ENV_VAR = "EO_USER"
 PASSWORD_ENV_VAR = "EO_PASS"
+LOG_FILENAME = 'eo-python.log'
+LOG_SIZE = 1000000  # bytes
+LOG_NUM = 5  # number of rotating logs to keep
 
 # The maximum number of favorites to consider for randomly displaying one.
 MAX_FAVORITES_FOR_DISPLAY = 200
@@ -41,11 +45,12 @@ MAX_FAVORITES_FOR_DISPLAY = 200
 NUM_FAVORITES_PER_REQUEST = 30
 
 
-class ElectricObject:
+class ElectricObject(object):
     """The ElectricObject class provides functions for the Electric Objects EO1."""
 
     def __init__(self, username, password):
         self.api = eo_api.EO_API(username, password)
+        self.logger = logging.getLogger(".".join(["eo", self.__class__.__name__]))
 
     def user(self):
         """Obtain the user information."""
@@ -126,7 +131,7 @@ class ElectricObject:
         try:
             id = device_json["reproduction"]["artwork"]["id"]
         except KeyError as e:
-            log("Error parsing device JSON. Missing key: {0}".format(e))
+            self.logger.error("problem parsing device JSON. Missing key: {0}".format(e))
         return id
 
     def display_random_favorite(self):
@@ -147,7 +152,7 @@ class ElectricObject:
         """
         devs = self.devices()
         if not devs:
-            log("Error in display_random_favorite: no devices returned.")
+            self.logger.error("in display_random_favorite: no devices returned.")
             return 0
         device_index = 0  # First device of user.
         current_image_id = self.current_artwork_id(devs[device_index])
@@ -168,7 +173,7 @@ class ElectricObject:
         """
         devs = self.devices()
         if not devs:
-            log("Error in set_url: no devices returned.")
+            self.logger.error("in set_url: no devices returned.")
             return 0
         device_index = 0  # First device of user.
         device_id = devs[device_index]["id"]
@@ -217,14 +222,34 @@ def get_credentials():
     return {"username": username, "password": password}
 
 
+def setup_logging():
+    """Set up logging to log to rotating files and also console output."""
+    formatter = logging.Formatter('%(asctime)-15s %(name)-5s %(levelname)-8s %(message)s')
+    logger = logging.getLogger("eo")
+    logger.setLevel(logging.INFO)
+
+    # rotating file handler
+    fh = logging.handlers.RotatingFileHandler(LOG_FILENAME, maxBytes=LOG_SIZE, backupCount=LOG_NUM)
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
+
+    # console handler
+    ch = logging.StreamHandler()
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+    return logger
+
+
 def main():
     """An example main that displays a random favorite."""
+    logger = setup_logging()
 
     credentials = get_credentials()
     eo = ElectricObject(username=credentials["username"], password=credentials["password"])
     displayed = eo.display_random_favorite()
     if displayed:
-        log("Displayed artwork id " + str(displayed))
+        logger.info("Displayed artwork id " + str(displayed))
 
     # Let's set a URL.
     # Hmmm. This one didn't work: http://www.ustream.tv/channel/live-iss-stream/pop-out

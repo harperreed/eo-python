@@ -1,5 +1,5 @@
 import eo_net
-from log import log
+import logging
 import requests
 import time
 
@@ -32,13 +32,14 @@ class EO_API(object):
         }
 
     def __init__(self, username, password):
+        self.logger = logging.getLogger(".".join(["eo", self.__class__.__name__]))
         signin_url = self.base_url + "sign_in"
         self.username = username
         self.password = password
         self.signin_url = signin_url
         self.last_signin_time = 0
 
-        self.net = eo_net.EO_Net(username, password, signin_url)
+        self.net = eo_net.EO_Net()
 
     def signin(self):
         """Sign in. If successful, set self.session to the session for reuse in
@@ -95,7 +96,7 @@ class EO_API(object):
             return None
 
         if endpoint not in self.endpoints.keys():
-            log("ERROR: unknown endpoint requested: " + endpoint)
+            self.logger.error("unknown endpoint requested: " + endpoint)
             return None
 
         url = self.base_url + self.api_version_path + self.endpoints[endpoint]
