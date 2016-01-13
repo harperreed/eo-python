@@ -291,6 +291,11 @@ def main():
     setup_logging()
 
     credentials = get_credentials()
+    if credentials["username"] == "" or credentials["password"] == "":
+        logger = logging.getLogger("eo")
+        logger.error("The username or password are blank. See code for how to set them. Exiting.")
+        exit()
+
     eo = ElectricObject(username=credentials["username"], password=credentials["password"])
 
     # demo(eo)
