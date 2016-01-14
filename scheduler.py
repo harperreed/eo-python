@@ -53,23 +53,27 @@ class Scheduler(object):
                 self.logger.error(e)
         self.schedule.sort()
 
-    def next_event_on_day(self, day):
-        """Return the next time in the schedule on the given day as an absolute date & time."""
-        time_now = datetime.datetime.now()
+    def next_event_after(self, day, last_time):
+        """Return the next time in the schedule on the given day that is later than last_time.
+        Args:
+            day: the day to use for the scheduled times
+            last_time: the time to exceed
+        Return the next time as an combined date & time.
+        """
         for t in self.schedule:
             next_time = datetime.datetime.combine(day, t)
-            if next_time > time_now:
+            if next_time > last_time:
                 return next_time
         return None
 
-    def next_event(self):
-        """Return the next time in the schedule, possibly tomorrow."""
+    def next_event(self, last_time):
+        """Return the next time in the schedule after last_time, possibly tomorrow."""
         today = datetime.date.today()
-        next_event = self.next_event_on_day(today)
+        next_event = self.next_event_after(today, last_time)
         if not next_event:
             tomorrow = today + datetime.timedelta(days=1)
-            first = self.schedule[0]
-            next_event = datetime.datetime.combine(tomorrow, first)
+            first_time = self.schedule[0]
+            next_event = datetime.datetime.combine(tomorrow, first_time)
         return next_event
 
     def add_jitter(self, atime):
@@ -84,11 +88,13 @@ class Scheduler(object):
             self.logger.error("No valid schedule to run. Returning.")
             return
 
+        last_time = datetime.datetime.now()
         while True:
-            next_time = self.next_event()
-            next_time = self.add_jitter(next_time)  # Note: could move into the past.
+            next_time = self.next_event(last_time)
+            last_time = next_time  # save before adding jitter
+            next_time_time = self.add_jitter(next_time)  # Note: could move into the past.
 
-            self.logger.info("Next update: %s", next_time.strftime("%Y-%m-%d %H:%M:%S"))
-            next_t = time.mktime(next_time.timetuple())
+            self.logger.info("Next update: %s", next_time_time.strftime("%Y-%m-%d %H:%M:%S"))
+            next_t = time.mktime(next_time_time.timetuple())
             self.scheduler.enterabs(next_t, 1, self.scheduled_fn, self.scheduled_fn_args)
             self.scheduler.run()
