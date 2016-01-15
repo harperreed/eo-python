@@ -169,8 +169,8 @@ class ElectricObject(object):
         if not fav_item:
             return 0
         fav_id = fav_item["artwork"]["id"]
-        self.display(str(fav_id))
-        return fav_id
+        res = self.display(str(fav_id))
+        return fav_id if res else 0
 
     def set_url(self, url):
         """Display the given URL on the first device associated with the signed-in user.
@@ -246,7 +246,7 @@ def setup_logging():
     return logger
 
 
-def new_favorite(eo):
+def show_a_new_favorite(eo):
     """Update the EO1 with a new, randomly selected favorite."""
     logger = logging.getLogger("eo")
     logger.info('Updating favorite')
@@ -300,7 +300,7 @@ def main():
 
     # demo(eo)
 
-    scheduler = Scheduler(SCHEDULE, lambda: new_favorite(eo), schedule_jitter=SCHEDULE_JITTER)
+    scheduler = Scheduler(SCHEDULE, lambda: show_a_new_favorite(eo), schedule_jitter=SCHEDULE_JITTER)
     scheduler.run()
 
 

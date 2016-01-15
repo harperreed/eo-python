@@ -188,8 +188,9 @@ class EO_Net(object):
             jittered_delay = self.jitter(delay, JITTER_FACTOR)
 
             # retries + 1: Use natural numbers for readability.
-            self.logger.error("failed request {0} of {1}. Retrying in {2:.1f} seconds.".
-                              format(retries + 1, NUM_RETRIES + 1, jittered_delay))
+            self.logger.error(
+                "failed request {0} of {1} to URL '{2}'. Retrying in {3:.1f} seconds.".format(
+                    retries + 1, NUM_RETRIES + 1, url, jittered_delay))
 
             # Exponential backoff: Double the delay between each retry, or equivilently,
             #     delay = INITIAL_RETRY_DELAY * 2 ** retries
@@ -200,7 +201,8 @@ class EO_Net(object):
             retries += 1
             time.sleep(jittered_delay)
 
-        self.logger.error("maximum HTTP request attempts ({0}) exceeded.".format(NUM_RETRIES + 1))
+        self.logger.error("maximum HTTP request attempts ({0}) exceeded to URL '{1}'.".format(
+            NUM_RETRIES + 1, url))
         return None
 
     def make_request(self, url, params=None, method="GET", parse_json=False):
