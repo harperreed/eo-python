@@ -31,6 +31,7 @@ import os
 import random
 import requests
 from scheduler import Scheduler
+import sys
 
 CREDENTIALS_FILE = ".credentials"
 USER_ENV_VAR = "EO_USER"
@@ -298,7 +299,9 @@ def main():
 
     eo = ElectricObject(username=credentials["username"], password=credentials["password"])
 
-    # demo(eo)
+    if sys.argv[1] == "--once":
+        show_a_new_favorite(eo)
+        exit()
 
     scheduler = Scheduler(SCHEDULE, lambda: show_a_new_favorite(eo), schedule_jitter=SCHEDULE_JITTER)
     scheduler.run()
