@@ -299,7 +299,7 @@ def main():
 
     eo = ElectricObject(username=credentials["username"], password=credentials["password"])
 
-    if sys.argv[1] == "--once":
+    if len(sys.argv) > 1 and sys.argv[1] == "--once":
         show_a_new_favorite(eo)
         exit()
 
