@@ -27,10 +27,12 @@
 
 import eo_api
 import logging
+import logging.handlers
 import os
 import random
 import requests
-import logging.handlers
+from scheduler import Scheduler
+import sys
 
 CREDENTIALS_FILE = ".credentials"
 USER_ENV_VAR = "EO_USER"
@@ -38,6 +40,10 @@ PASSWORD_ENV_VAR = "EO_PASS"
 LOG_FILENAME = 'eo-python.log'
 LOG_SIZE = 1000000  # bytes
 LOG_NUM = 5  # number of rotating logs to keep
+
+
+SCHEDULE = ["7:02", "12:02", "17:02", "22:02"]  # 24-hour time format
+SCHEDULE_JITTER = 10  # in minutes
 
 # The maximum number of favorites to consider for randomly displaying one.
 MAX_FAVORITES_FOR_DISPLAY = 200
@@ -165,8 +171,8 @@ class ElectricObject(object):
         if not fav_item:
             return 0
         fav_id = fav_item["artwork"]["id"]
-        self.display(str(fav_id))
-        return fav_id
+        res = self.display(str(fav_id))
+        return fav_id if res else 0
 
     def set_url(self, url):
         """Display the given URL on the first device associated with the signed-in user.
@@ -242,12 +248,19 @@ def setup_logging():
     return logger
 
 
-def main():
-    """An example main that displays a random favorite."""
-    logger = setup_logging()
+def show_a_new_favorite(eo):
+    """Update the EO1 with a new, randomly selected favorite."""
+    logger = logging.getLogger("eo")
+    logger.info('Updating favorite')
+    displayed = eo.display_random_favorite()
+    if displayed:
+        logger.info("Displayed artwork id " + str(displayed))
 
-    credentials = get_credentials()
-    eo = ElectricObject(username=credentials["username"], password=credentials["password"])
+
+def demo(eo):
+    """An example that displays a random favorite."""
+    logger = logging.getLogger("eo")
+
     displayed = eo.display_random_favorite()
     if displayed:
         logger.info("Displayed artwork id " + str(displayed))
@@ -274,6 +287,26 @@ def main():
 
     # Display a media item by id.
     # print eo.display("1136")
+
+
+def main():
+    setup_logging()
+
+    credentials = get_credentials()
+    if credentials["username"] == "" or credentials["password"] == "":
+        logger = logging.getLogger("eo")
+        logger.error("The username or password are blank. See code for how to set them. Exiting.")
+        exit()
+
+    eo = ElectricObject(username=credentials["username"], password=credentials["password"])
+
+    if len(sys.argv) > 1 and sys.argv[1] == "--once":
+        show_a_new_favorite(eo)
+        exit()
+
+    scheduler = Scheduler(SCHEDULE, lambda: show_a_new_favorite(eo), schedule_jitter=SCHEDULE_JITTER)
+    scheduler.run()
+
 
 if __name__ == "__main__":
     main()
